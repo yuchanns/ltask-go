@@ -1,36 +1,34 @@
 package ltask
 
 import (
-	"runtime"
-
 	"go.yuchanns.xyz/lua/lua54"
 )
 
-var lib *lua.Lib
+func OpenLibs(L *lua.State) {
+	_ = L.GetGlobal("package")
+	_, _ = L.GetField(-1, "preload")
 
-func init() {
-	var path string
-	switch runtime.GOOS {
-	case "windows":
-		path = "./lua/lua54/.lua/lib/lua54.dll"
-	case "linux":
-		path = "./lua/lua54/.lua/lib/liblua54.so"
-	case "darwin":
-		path = "./lua/lua54/.lua/lib/liblua54.dylib"
+	l := []luaLReg{
+		{"ltask.bootstrap", ltaskBootstrap},
 	}
-	var err error
-	lib, err = lua.New(path)
-	if err != nil {
-		panic(err)
-	}
+	luaLSetFuncs(L, l)
+	L.Pop(2)
 }
 
-func Hello() (err error) {
-	L, err := lib.NewState()
-	if err != nil {
-		return
+type luaLReg struct {
+	Name string
+	Func lua.GoFunc
+}
+
+func luaLNewLib(L *lua.State, l []luaLReg) {
+	L.NewTable()
+
+	luaLSetFuncs(L, l)
+}
+
+func luaLSetFuncs(L *lua.State, l []luaLReg) {
+	for _, i := range l {
+		L.PushGoFunction(i.Func)
+		L.SetField(-2, i.Name)
 	}
-	L.OpenLibs()
-	err = L.DoString(`print("Hello from Lua!")`)
-	return
 }
