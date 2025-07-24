@@ -4,23 +4,95 @@ A showcase of how to build a lua library with [go.yuchanns.xyz/lua](https://gith
 
 ## Instructions
 
-### Clone the repository
+### Usage
+
 ```bash
-git clone https://github.com/yuchanns/ltask-go
-
-cd ltask-go
-
-git submodule update --init --recursive
+go get go.yuchanns.xyz/ltask
 ```
 
-### Prepare the dynamic artifacts
+**Go usage**
+
+```go
+func main() {
+	lib, err := lua.New("/path/to/lua54.so")
+	if err != nil {
+		panic(err)
+	}
+	defer lib.Close()
+
+	L, err := lib.NewState()
+	if err != nil {
+		panic(err)
+	}
+	defer L.Close()
+
+	L.OpenLibs()
+
+	// Open the ltask library
+	ltask.OpenLibs(L)
+
+	// Now you can use ltask in Lua
+	L.DoFile(`./main.lua`)
+
+	// ...
+}
+```
+
+**Lua usage**
+
+```lua
+-- user
+local ltask = require "ltask"
+
+local S = {}
+
+print "User Start"
+
+function S.ping(...)
+	ltask.timeout(10, function() print(1) end)
+	ltask.timeout(20, function() print(2) end)
+	ltask.timeout(30, function() print(3) end)
+	ltask.sleep(40) -- sleep 0.4 sec
+	-- response
+	return "PING", ...
+end
+
+return S
+
+-- root
+local function boot()
+	print "Root Start"
+	print(os.date("%c", (ltask.now())))
+	local addr = S.spawn("user", "Hello")	-- spawn a new service `user`
+	print(ltask.call(addr, "ping", "PONG"))	-- request "ping" message
+end
+
+boot()
+```
+
+### Devlopment
+
+We use Go Workspace to manage in early development stage, so you can use the following commands to run the tests.
+
+1. **Clone the repository**
+```bash
+mkdir ltask_workspace
+
+cd ltask_workspace
+
+git clone https://github.com/yuchanns/ltask-go
+
+git clone --recurse-submodules https://github.com/yuchanns/lua
+```
+
+2. **Prepare the dynamic artifacts**
 ```bash
 cd lua && make lua54 && cd -
 ```
 
-### Run the tests
+3. **Run the tests**
 ```bash
-go test -v ./...
+cd ltask-go && go test -v ./...
 ```
 
 ## Credits
