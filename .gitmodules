@@ -1,3 +1,0 @@
-[submodule "lua"]
-	path = lua
-	url = git@github.com:yuchanns/lua

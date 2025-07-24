@@ -16,9 +16,14 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
         version: ["5.4"]
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
+          path: ltask-go
+      - uses: actions/checkout@v4
+        with:
+          path: lua
+          repository: yuchanns/lua
           submodules: recursive
           token: ${{ secrets.GH_PAT }}
       - uses: ilammy/msvc-dev-cmd@v1
@@ -47,8 +52,14 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: stable
+      - name: Set up Go workspace
+        run: |
+          go work init
+          go work use ./ltask-go
+          go work use ./lua
       - name: Run tests
         run: |
           go test -v ./...
+        working-directory: ltask-go
         env:
           CGO_ENABLE: 0 # Disable CGO to ensure pure Go tests

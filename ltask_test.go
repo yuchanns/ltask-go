@@ -26,7 +26,7 @@ func (s *Suite) Setup() (err error) {
 	case "darwin":
 		path = "liblua54.dylib"
 	}
-	s.lib, err = lua.New(fmt.Sprintf("./lua/lua54/.lua/lib/%s", path))
+	s.lib, err = lua.New(fmt.Sprintf("../lua/lua54/.lua/lib/%s", path))
 	if err != nil {
 		return
 	}

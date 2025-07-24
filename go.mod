@@ -2,10 +2,9 @@ module go.yuchanns.xyz/ltask
 
 go 1.24.3
 
-replace go.yuchanns.xyz/lua => ./lua
+replace go.yuchanns.xyz/lua => ../lua
 
 require (
-	github.com/iancoleman/strcase v0.3.0
 	github.com/stretchr/testify v1.10.0
 	go.yuchanns.xyz/lua v0.0.0-00010101000000-000000000000
 )
