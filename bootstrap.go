@@ -1,6 +1,7 @@
 package ltask
 
 import (
+	"sync/atomic"
 	"unsafe"
 
 	"go.yuchanns.xyz/lua"
@@ -21,19 +22,22 @@ func ltaskInit(L *lua.State) int {
 
 	config.Load(L, 1)
 
-	if config.CrashLog[0] != nil {
+	if config.crashLog[0] != nil {
 		// TODO: set crash log
 	}
 
 	var task *ltask
-	task = (*ltask)(L.NewUserDataUv(int(unsafe.Sizeof(*task)), 0))
-	L.SetField(lua.LUA_REGISTRYINDEX, "LTASK_GLOBAL")
+	task.init(L, config)
 
-	task.config = config
 	return 1
 }
 
+var bootInit atomic.Int32
+
 func ltaskBootstrap(L *lua.State) int {
+	if bootInit.Add(1) != 1 {
+		return L.Errorf("ltask.bootstrap can only require once")
+	}
 	l := []luaLReg{
 		{"init", ltaskInit},
 	}

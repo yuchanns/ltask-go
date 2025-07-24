@@ -7,11 +7,14 @@ import (
 	"go.yuchanns.xyz/lua"
 )
 
+type atomicInt = int32
+
 const (
 	defaultMaxService   = 65536
 	defaultQueue        = 4096
 	defaultQueueSending = defaultQueue
 	maxWorker           = 256
+	maxSockEvent        = 16
 )
 
 func alignPow2(x uint) uint {
@@ -22,65 +25,65 @@ func alignPow2(x uint) uint {
 }
 
 type ltaskConfig struct {
-	Worker        int
-	Queue         int
-	QueueSending  int
-	MaxService    int
-	ExternalQueue int
-	CrashLog      [128]*string
+	worker        int64
+	queue         int64
+	queueSending  int64
+	maxService    int64
+	externalQueue int64
+	crashLog      [128]*string
 }
 
 func (config *ltaskConfig) Load(L *lua.State, index int) {
 	L.CheckType(index, lua.LUA_TTABLE)
-	config.Worker = configGetInit(L, index, "worker", 1)
+	config.worker = configGetInit(L, index, "worker", 0)
 	ncores := runtime.NumCPU()
 	if ncores <= 1 {
 		L.Errorf("Need at least 2 cores")
 		return
 	}
-	if config.Worker == 0 {
-		config.Worker = ncores - 1
+	if config.worker == 0 {
+		config.worker = int64(ncores - 1)
 	}
-	if config.Worker > maxWorker {
-		config.Worker = maxWorker
+	if config.worker > maxWorker {
+		config.worker = maxWorker
 	}
-	config.Queue = int(alignPow2(uint(configGetInit(L, index, "queue", defaultQueue))))
-	config.QueueSending = int(alignPow2(uint(configGetInit(L, index, "queue_sending", defaultQueueSending))))
-	config.MaxService = int(alignPow2(uint(configGetInit(L, index, "max_service", defaultMaxService))))
-	config.ExternalQueue = configGetInit(L, index, "external_queue", 0)
+	config.queue = int64(alignPow2(uint(configGetInit(L, index, "queue", defaultQueue))))
+	config.queueSending = int64(alignPow2(uint(configGetInit(L, index, "queue_sending", defaultQueueSending))))
+	config.maxService = int64(alignPow2(uint(configGetInit(L, index, "max_service", defaultMaxService))))
+	config.externalQueue = configGetInit(L, index, "external_queue", 0)
 	typ, _ := L.GetField(index, "crash_log")
 	if typ != lua.LUA_TSTRING {
-		config.CrashLog[0] = nil
+		config.crashLog[0] = nil
 	} else {
 		var sz int
 		log := L.ToLString(-1, &sz)
-		if sz > len(config.CrashLog) {
-			config.CrashLog[0] = nil
+		if sz > len(config.crashLog) {
+			config.crashLog[0] = nil
 		} else {
-			config.CrashLog[0] = new(string)
-			*config.CrashLog[0] = log
+			config.crashLog[0] = new(string)
+			*config.crashLog[0] = log
 		}
 	}
 
-	L.PushInteger(int64(config.Worker))
+	L.PushInteger(int64(config.worker))
 	L.SetField(index, "worker")
-	L.PushInteger(int64(config.Queue))
+	L.PushInteger(int64(config.queue))
 	L.SetField(index, "queue")
-	L.PushInteger(int64(config.MaxService))
+	L.PushInteger(int64(config.maxService))
 	L.SetField(index, "max_service")
 	L.PushValue(index)
 }
 
-func configGetInit(L *lua.State, index int, key string, opt int) int {
+func configGetInit(L *lua.State, index int, key string, opt int64) int64 {
 	typ, _ := L.GetField(index, key)
 	if typ == lua.LUA_TNIL {
 		L.Pop(1)
 		return opt
 	}
 	if !L.IsInteger(-1) {
-		return L.Errorf("%s should be an integer", key)
+		return int64(L.Errorf("%s should be an integer", key))
 	}
 	r := L.ToInteger(-1)
 	L.Pop(1)
-	return int(r)
+	return r
 }
