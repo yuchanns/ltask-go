@@ -3,7 +3,7 @@ package ltask
 import (
 	"fmt"
 
-	"go.yuchanns.xyz/lua/lua54"
+	"go.yuchanns.xyz/lua"
 )
 
 func ltaskInit(L *lua.State) int {

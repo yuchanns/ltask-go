@@ -1,7 +1,7 @@
 package ltask
 
 import (
-	"go.yuchanns.xyz/lua/lua54"
+	"go.yuchanns.xyz/lua"
 )
 
 func OpenLibs(L *lua.State) {
