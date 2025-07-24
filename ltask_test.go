@@ -68,9 +68,9 @@ func TestSuite(t *testing.T) {
 
 			L.OpenLibs()
 
-			t.Cleanup(L.Close)
-
 			ltask.OpenLibs(L)
+
+			t.Cleanup(L.Close)
 
 			testFunc(suite, func(file string) {
 				assert.NoError(L.DoFile(fmt.Sprintf("testdata/%s", file)))

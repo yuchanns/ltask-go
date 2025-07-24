@@ -32,3 +32,7 @@ func luaLSetFuncs(L *lua.State, l []luaLReg) {
 		L.SetField(-2, i.Name)
 	}
 }
+
+type ltask struct {
+	config *ltaskConfig
+}
