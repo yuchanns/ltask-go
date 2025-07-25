@@ -10,6 +10,7 @@ require (
 )
 
 require (
+	github.com/RussellLuo/timingwheel v0.0.0-20220218152713-54845bda3108 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/ebitengine/purego v0.8.4 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect

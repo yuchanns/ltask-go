@@ -45,7 +45,7 @@ type ltask struct {
 	// TODO: event sockevent?
 	services *servicePool
 	schedule *queue
-	// TODO: timer timerwheel?
+	timer    *timer
 	// TODO: logqueue?
 	externalMessage     *queue
 	externalLastMessage *message
