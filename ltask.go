@@ -96,8 +96,8 @@ func (task *ltask) initWorker(L *lua.State) {
 		worker.wakeup = 0
 		worker.busy = 0
 
-		l := (*sync.Mutex)(malloc.alloc(uint64(unsafe.Sizeof(sync.Mutex{}))))
-		worker.trigger = (*sync.Cond)(malloc.alloc(uint64(unsafe.Sizeof(sync.Cond{L: l}))))
+		l := alloc[sync.Mutex](malloc)
+		worker.trigger = alloc[sync.Cond](malloc)
 		worker.trigger.L = l
 	}
 }

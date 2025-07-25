@@ -51,6 +51,16 @@ func createArena(chunkSize uint64) *arena {
 	return a
 }
 
+func makeSlice[T any](a *arena, n uint64) []T {
+	var t T
+	return unsafe.Slice((*T)(malloc.alloc(uint64(unsafe.Sizeof(t)))), n)
+}
+
+func alloc[T any](a *arena) *T {
+	var t T
+	return (*T)(a.alloc(uint64(unsafe.Sizeof(t))))
+}
+
 func (a *arena) alloc(n uint64) unsafe.Pointer {
 	chunk, next := a.cursor.add(n)
 	if next < a.chunkSize {

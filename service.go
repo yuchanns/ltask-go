@@ -1,8 +1,6 @@
 package ltask
 
 import (
-	"unsafe"
-
 	"go.yuchanns.xyz/lua"
 )
 
@@ -40,20 +38,10 @@ type servicePool struct {
 }
 
 func newServicePool(config *ltaskConfig) (pool *servicePool) {
-	services := unsafe.Slice(
-		(**service)(malloc.alloc(
-			uint64(unsafe.Sizeof(&service{}))*uint64(config.maxService),
-		)),
-		config.maxService,
-	)
-	pool = (*servicePool)(
-		malloc.alloc(
-			uint64(unsafe.Sizeof(servicePool{})),
-		),
-	)
+	pool = alloc[servicePool](malloc)
 	pool.mask = config.maxService - 1
 	pool.queueLen = config.queue
 	pool.id = typeIdCount
-	pool.s = services
+	pool.s = makeSlice[*service](malloc, uint64(config.maxService))
 	return
 }
