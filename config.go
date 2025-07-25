@@ -33,7 +33,7 @@ type ltaskConfig struct {
 	crashLog      [128]*string
 }
 
-func (config *ltaskConfig) Load(L *lua.State, index int) {
+func (config *ltaskConfig) load(L *lua.State, index int) {
 	L.CheckType(index, lua.LUA_TTABLE)
 	config.worker = configGetInit(L, index, "worker", 0)
 	ncores := runtime.NumCPU()

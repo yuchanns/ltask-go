@@ -64,6 +64,7 @@ func (task *ltask) init(L *lua.State, config *ltaskConfig) {
 
 	task.services = newServicePool(config)
 	if config.externalQueue > 0 {
+		// FIXME: allocate a queue without gc tracking
 		task.externalMessage = make(chan message, config.externalQueue)
 	}
 
@@ -94,6 +95,7 @@ func (task *ltask) initWorker(L *lua.State) {
 		worker.sleeping = 0
 		worker.wakeup = 0
 		worker.busy = 0
+		// FIXME: allocate a queue without gc tracking
 		worker.trigger = make(chan struct{}, 1)
 	}
 }

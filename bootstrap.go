@@ -7,6 +7,8 @@ import (
 	"go.yuchanns.xyz/lua"
 )
 
+var malloc *arena
+
 func ltaskInit(L *lua.State) int {
 	if L.GetTop() == 0 {
 		L.NewTable()
@@ -16,11 +18,14 @@ func ltaskInit(L *lua.State) int {
 		return L.Errorf("Already init")
 	}
 	L.Pop(1)
+
+	malloc = createArena(1024 * 1024)
+
 	var config *ltaskConfig
 	config = (*ltaskConfig)(L.NewUserDataUv(int(unsafe.Sizeof(*config)), 0))
 	_ = L.SetField(lua.LUA_REGISTRYINDEX, "LTASK_CONFIG")
 
-	config.Load(L, 1)
+	config.load(L, 1)
 
 	if config.crashLog[0] != nil {
 		// TODO: set crash log
