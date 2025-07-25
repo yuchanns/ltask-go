@@ -30,7 +30,7 @@ type ltaskConfig struct {
 	queueSending  int64
 	maxService    int64
 	externalQueue int64
-	crashLog      [128]*string
+	crashLog      []byte
 }
 
 func (config *ltaskConfig) load(L *lua.State, index int) {
@@ -52,16 +52,13 @@ func (config *ltaskConfig) load(L *lua.State, index int) {
 	config.maxService = int64(alignPow2(uint(configGetInit(L, index, "max_service", defaultMaxService))))
 	config.externalQueue = configGetInit(L, index, "external_queue", 0)
 	typ, _ := L.GetField(index, "crash_log")
-	if typ != lua.LUA_TSTRING {
-		config.crashLog[0] = nil
-	} else {
-		var sz int
-		log := L.ToLString(-1, &sz)
-		if sz > len(config.crashLog) {
-			config.crashLog[0] = nil
-		} else {
-			config.crashLog[0] = new(string)
-			*config.crashLog[0] = log
+	if typ == lua.LUA_TSTRING {
+		var size int
+		log := L.ToLString(-1, &size)
+		if size < 128 {
+			crashLog := makeSlice[byte](malloc, uint64(size+1))
+			copy(crashLog, []byte(log))
+			config.crashLog = crashLog
 		}
 	}
 

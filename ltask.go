@@ -40,10 +40,11 @@ func luaLSetFuncs(L *lua.State, l []luaLReg) {
 type ltask struct {
 	config    *ltaskConfig
 	workers   []workerThread
-	eventInit [maxSockEvent]atomicInt
+	eventInit []atomicInt
+	event     []*chan struct{}
 	// TODO: event sockevent?
 	services *servicePool
-	schedule chan any
+	schedule *queue
 	// TODO: timer timerwheel?
 	// TODO: logqueue?
 	externalMessage     *queue
@@ -55,6 +56,8 @@ type ltask struct {
 	// TODO: logfile?
 }
 
+var refEvent []*chan struct{}
+
 func (task *ltask) init(L *lua.State, config *ltaskConfig) {
 	task = (*ltask)(L.NewUserDataUv(int(unsafe.Sizeof(*task)), 0))
 	L.SetField(lua.LUA_REGISTRYINDEX, "LTASK_GLOBAL")
@@ -64,6 +67,7 @@ func (task *ltask) init(L *lua.State, config *ltaskConfig) {
 	task.initWorker(L)
 
 	task.services = newServicePool(config)
+	task.schedule = newQueueInt(int(config.maxService))
 	if config.externalQueue > 0 {
 		task.externalMessage = newQueuePtr(int(config.externalQueue))
 	}
@@ -71,6 +75,15 @@ func (task *ltask) init(L *lua.State, config *ltaskConfig) {
 	atomic.StoreInt32(&task.scheduleOwner, threadNone)
 	atomic.StoreInt32(&task.activeWorker, 0)
 	atomic.StoreInt32(&task.threadCount, 0)
+
+	task.event = make([]*chan struct{}, maxSockEvent)
+	task.eventInit = makeSlice[atomicInt](malloc, maxSockEvent)
+	for i := range task.event {
+		ch := make(chan struct{})
+		task.event[i] = &ch
+		atomic.StoreInt32(&task.eventInit[i], 0)
+	}
+	refEvent = task.event
 }
 
 func (task *ltask) initWorker(L *lua.State) {

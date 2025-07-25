@@ -27,7 +27,7 @@ func ltaskInit(L *lua.State) int {
 
 	config.load(L, 1)
 
-	if config.crashLog[0] != nil {
+	if config.crashLog != nil {
 		// TODO: set crash log
 	}
 
