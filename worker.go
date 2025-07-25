@@ -1,5 +1,7 @@
 package ltask
 
+import "sync"
+
 const bindingServiceQueue = 16
 
 type serviceId uint64
@@ -22,5 +24,5 @@ type workerThread struct {
 	sleeping     int64
 	wakeup       int64
 	busy         int64
-	trigger      chan struct{}
+	trigger      *sync.Cond
 }

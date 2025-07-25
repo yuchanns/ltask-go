@@ -1,6 +1,7 @@
 package ltask
 
 import (
+	"sync"
 	"sync/atomic"
 	"unsafe"
 
@@ -45,7 +46,7 @@ type ltask struct {
 	schedule chan any
 	// TODO: timer timerwheel?
 	// TODO: logqueue?
-	externalMessage     chan message
+	externalMessage     *queue
 	externalLastMessage *message
 	scheduleOwner       atomicInt
 	activeWorker        atomicInt
@@ -64,8 +65,7 @@ func (task *ltask) init(L *lua.State, config *ltaskConfig) {
 
 	task.services = newServicePool(config)
 	if config.externalQueue > 0 {
-		// FIXME: allocate a queue without gc tracking
-		task.externalMessage = make(chan message, config.externalQueue)
+		task.externalMessage = newQueuePtr(int(config.externalQueue))
 	}
 
 	atomic.StoreInt32(&task.scheduleOwner, threadNone)
@@ -95,8 +95,10 @@ func (task *ltask) initWorker(L *lua.State) {
 		worker.sleeping = 0
 		worker.wakeup = 0
 		worker.busy = 0
-		// FIXME: allocate a queue without gc tracking
-		worker.trigger = make(chan struct{}, 1)
+
+		l := (*sync.Mutex)(malloc.alloc(uint64(unsafe.Sizeof(sync.Mutex{}))))
+		worker.trigger = (*sync.Cond)(malloc.alloc(uint64(unsafe.Sizeof(sync.Cond{L: l}))))
+		worker.trigger.L = l
 	}
 }
 
