@@ -86,6 +86,7 @@ func (task *ltask) init(L *lua.State, config *ltaskConfig) {
 	}
 	refEvent = &event
 	task.event = &event
+	task.timer = nil
 }
 
 func (task *ltask) initWorker(L *lua.State) {
