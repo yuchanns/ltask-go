@@ -39,9 +39,9 @@ func luaLSetFuncs(L *lua.State, l []luaLReg) {
 
 type ltask struct {
 	config    *ltaskConfig
-	workers   *[]workerThread
-	eventInit *[]atomicInt
-	event     *[]*chan struct{}
+	workers   []workerThread
+	eventInit []atomicInt
+	event     []*chan struct{}
 	// TODO: event sockevent?
 	services *servicePool
 	schedule *queue
@@ -56,7 +56,7 @@ type ltask struct {
 	// TODO: logfile?
 }
 
-var refEvent *[]*chan struct{}
+var refEvent []*chan struct{}
 
 func (task *ltask) init(L *lua.State, config *ltaskConfig) {
 	task = (*ltask)(L.NewUserDataUv(int(unsafe.Sizeof(*task)), 0))
@@ -78,14 +78,14 @@ func (task *ltask) init(L *lua.State, config *ltaskConfig) {
 
 	event := make([]*chan struct{}, maxSockEvent)
 	eventInit := makeSlice[atomicInt](malloc, maxSockEvent)
-	task.eventInit = &eventInit
+	task.eventInit = eventInit
 	for i := range event {
 		ch := make(chan struct{})
 		event[i] = &ch
-		atomic.StoreInt32(&(*task.eventInit)[i], 0)
+		atomic.StoreInt32(&task.eventInit[i], 0)
 	}
-	refEvent = &event
-	task.event = &event
+	refEvent = event
+	task.event = event
 	// Windows compatiblity: initialize the timer with a nil value
 	// to clear any wired data in the memory.
 	task.timer = nil
@@ -98,11 +98,11 @@ func (task *ltask) initWorker(L *lua.State) {
 		)),
 		task.config.worker,
 	)
-	task.workers = &workers
+	task.workers = workers
 	L.SetField(lua.LUA_REGISTRYINDEX, "LTASK_WORKERS")
 
 	for id := range task.config.worker {
-		worker := &(*task.workers)[id]
+		worker := &task.workers[id]
 		worker.task = task
 		worker.workerId = id
 		worker.running = 0
