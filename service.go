@@ -176,13 +176,38 @@ func (p *servicePool) deleteService(id serviceId) {
 	s.close()
 }
 
+func requireModule(L *lua.State) int {
+	name := *(*string)(L.ToUserData(1))
+	fn := *(*lua.GoFunc)(L.ToUserData(2))
+	L.Requiref(name, fn, false)
+	return 0
+}
+
+func (p *servicePool) requiref(id serviceId, name string, fn lua.GoFunc, pL *lua.State) (ok bool) {
+	s := p.getService(id)
+	if s == nil || s.rL == nil {
+		errorMessage(nil, pL, "requiref: No service")
+		return
+	}
+	L := s.rL
+	L.PushGoFunction(requireModule)
+	L.PushLightUserData(&name)
+	L.PushLightUserData(&fn)
+	if L.PCall(2, 0, 0) != nil {
+		errorMessage(L, pL, "requiref: pcall error")
+		L.Pop(1)
+		return
+	}
+	return true
+}
+
 func (task *ltask) newService(L *lua.State, id serviceId, label string,
 	source string, sourceSz int, chunkName string, workerId int64) (ok bool) {
 	ud := &serviceUd{
 		task: task,
 		id:   id,
 	}
-	if !task.services.initService(ud, L) {
+	if !task.services.initService(ud, L) || !task.services.requiref(id, "ltask", openLtask, L) {
 		task.services.deleteService(id)
 		L.PushString(fmt.Sprintf("New service fail: %s", getErrorMessage(L)))
 		return false

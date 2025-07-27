@@ -23,6 +23,10 @@ func OpenLibs(L *lua.State, lib *lua.Lib) {
 	luaLib = lib
 }
 
+func openLtask(L *lua.State) int {
+	return 0
+}
+
 type luaLReg struct {
 	name string
 	fn   lua.GoFunc
