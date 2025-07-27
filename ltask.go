@@ -86,6 +86,9 @@ func (task *ltask) init(L *lua.State, config *ltaskConfig) {
 	}
 	refEvent = &event
 	task.event = &event
+	// Windows compatiblity: initialize the timer with a nil value
+	// to clear any wired data in the memory.
+	task.timer = nil
 }
 
 func (task *ltask) initWorker(L *lua.State) {
