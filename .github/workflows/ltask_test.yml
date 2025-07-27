@@ -25,7 +25,6 @@ jobs:
           path: lua
           repository: yuchanns/lua
           submodules: recursive
-          token: ${{ secrets.GH_PAT }}
       - uses: ilammy/msvc-dev-cmd@v1
         if: matrix.os == 'windows-latest'
       - name: Set module directory
