@@ -7,6 +7,14 @@ type message struct {
 	to      serviceId
 	session session
 	typ     int
-	msg     any
+	msg     any // TODO: what type is this?
 	sz      int64
 }
+
+const (
+	messageReceiptNone     = 0
+	messageReceiptDone     = 1
+	messageReceiptError    = 2
+	messageReceiptBlock    = 3
+	messageReceiptResponse = 4
+)

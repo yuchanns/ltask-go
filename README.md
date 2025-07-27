@@ -33,7 +33,7 @@ func main() {
 	L.OpenLibs()
 
 	// Open the ltask library
-	ltask.OpenLibs(L)
+	ltask.OpenLibs(L, lib)
 
 	// Now you can use ltask in Lua
 	L.DoFile(`./main.lua`)

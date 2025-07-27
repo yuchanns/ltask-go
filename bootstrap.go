@@ -23,7 +23,7 @@ func getPtr[T any](L *lua.State, key string) *T {
 	return (*T)(v)
 }
 
-var malloc *arena
+var task *ltask
 
 func ltaskInit(L *lua.State) int {
 	if L.GetTop() == 0 {
@@ -35,8 +35,6 @@ func ltaskInit(L *lua.State) int {
 	}
 	L.Pop(1)
 
-	malloc = createArena(1024 * 1024)
-
 	var config *ltaskConfig
 	config = (*ltaskConfig)(L.NewUserDataUv(int(unsafe.Sizeof(*config)), 0))
 	_ = L.SetField(lua.LUA_REGISTRYINDEX, "LTASK_CONFIG")
@@ -47,7 +45,6 @@ func ltaskInit(L *lua.State) int {
 		// TODO: set crash log
 	}
 
-	var task *ltask
 	task.init(L, config)
 
 	return 1
@@ -63,6 +60,27 @@ func ltaskInitTimer(L *lua.State) int {
 	return 0
 }
 
+func ltaskNewService(L *lua.State) int {
+	task := getPtr[ltask](L, "LTASK_GLOBAL")
+	label := L.CheckString(1)
+	var sourceSz int
+	source := L.CheckLString(2, &sourceSz)
+	chunkName := L.CheckString(3)
+	sid := L.OptInteger(4, 0)
+	workerId := L.OptInteger(5, -1)
+
+	id := task.services.newService(sid)
+
+	if !task.newService(L, id, label, source, sourceSz, chunkName, workerId) {
+		L.PushBoolean(false)
+		L.Insert(-2)
+		return 2
+	}
+
+	L.PushInteger(id)
+	return 1
+}
+
 var bootInit atomic.Int32
 
 func ltaskBootstrap(L *lua.State) int {
@@ -71,6 +89,7 @@ func ltaskBootstrap(L *lua.State) int {
 	}
 	l := []luaLReg{
 		{"init", ltaskInit},
+		{"new_service", ltaskNewService},
 		{"init_timer", ltaskInitTimer},
 		// We don't need `init_socket` here, as it is proceed by Go runtime automatically.
 	}

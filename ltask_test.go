@@ -80,7 +80,7 @@ func TestSuite(t *testing.T) {
 
 			L.OpenLibs()
 
-			ltask.OpenLibs(L)
+			ltask.OpenLibs(L, suite.lib)
 
 			t.Cleanup(L.Close)
 

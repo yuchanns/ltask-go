@@ -9,7 +9,7 @@ type timer struct {
 }
 
 func newTimer() *timer {
-	t := alloc[timer](malloc)
+	t := &timer{}
 	t.init()
 
 	now := time.Now().UnixNano()

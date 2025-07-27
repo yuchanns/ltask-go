@@ -4,7 +4,7 @@ import "sync"
 
 const bindingServiceQueue = 16
 
-type serviceId uint64
+type serviceId = int64
 
 type bindingService struct {
 	head int64
