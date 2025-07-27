@@ -8,7 +8,9 @@ import (
 	"go.yuchanns.xyz/lua"
 )
 
-func OpenLibs(L *lua.State) {
+var luaLib *lua.Lib
+
+func OpenLibs(L *lua.State, lib *lua.Lib) {
 	_ = L.GetGlobal("package")
 	_, _ = L.GetField(-1, "preload")
 
@@ -17,6 +19,8 @@ func OpenLibs(L *lua.State) {
 	}
 	luaLSetFuncs(L, l)
 	L.Pop(2)
+
+	luaLib = lib
 }
 
 type luaLReg struct {
@@ -39,15 +43,14 @@ func luaLSetFuncs(L *lua.State, l []luaLReg) {
 
 type ltask struct {
 	config    *ltaskConfig
-	workers   *[]workerThread
-	eventInit *[]atomicInt
-	event     *[]*chan struct{}
-	// TODO: event sockevent?
-	services *servicePool
-	schedule *queue
-	timer    *timer
+	workers   []workerThread
+	eventInit []atomicInt
+	event     []chan struct{}
+	services  *servicePool
+	schedule  chan int
+	timer     *timer
 	// TODO: logqueue?
-	externalMessage     *queue
+	externalMessage     chan any
 	externalLastMessage *message
 	scheduleOwner       atomicInt
 	activeWorker        atomicInt
@@ -55,8 +58,6 @@ type ltask struct {
 	blockedService      int64
 	// TODO: logfile?
 }
-
-var refEvent *[]*chan struct{}
 
 func (task *ltask) init(L *lua.State, config *ltaskConfig) {
 	task = (*ltask)(L.NewUserDataUv(int(unsafe.Sizeof(*task)), 0))
@@ -67,25 +68,24 @@ func (task *ltask) init(L *lua.State, config *ltaskConfig) {
 	task.initWorker(L)
 
 	task.services = newServicePool(config)
-	task.schedule = newQueueInt(int(config.maxService))
+	task.schedule = make(chan int, config.maxService)
 	if config.externalQueue > 0 {
-		task.externalMessage = newQueuePtr(int(config.externalQueue))
+		task.externalMessage = make(chan any, config.externalQueue)
 	}
 
 	atomic.StoreInt32(&task.scheduleOwner, threadNone)
 	atomic.StoreInt32(&task.activeWorker, 0)
 	atomic.StoreInt32(&task.threadCount, 0)
 
-	event := make([]*chan struct{}, maxSockEvent)
-	eventInit := makeSlice[atomicInt](malloc, maxSockEvent)
-	task.eventInit = &eventInit
+	event := make([]chan struct{}, maxSockEvent)
+	eventInit := make([]atomicInt, maxSockEvent)
+	task.eventInit = eventInit
 	for i := range event {
 		ch := make(chan struct{})
-		event[i] = &ch
-		atomic.StoreInt32(&(*task.eventInit)[i], 0)
+		event[i] = ch
+		atomic.StoreInt32(&task.eventInit[i], 0)
 	}
-	refEvent = &event
-	task.event = &event
+	task.event = event
 	// Windows compatiblity: initialize the timer with a nil value
 	// to clear any wired data in the memory.
 	task.timer = nil
@@ -98,11 +98,11 @@ func (task *ltask) initWorker(L *lua.State) {
 		)),
 		task.config.worker,
 	)
-	task.workers = &workers
+	task.workers = workers
 	L.SetField(lua.LUA_REGISTRYINDEX, "LTASK_WORKERS")
 
 	for id := range task.config.worker {
-		worker := &(*task.workers)[id]
+		worker := &task.workers[id]
 		worker.task = task
 		worker.workerId = id
 		worker.running = 0
@@ -115,9 +115,7 @@ func (task *ltask) initWorker(L *lua.State) {
 		worker.wakeup = 0
 		worker.busy = 0
 
-		l := alloc[sync.Mutex](malloc)
-		worker.trigger = alloc[sync.Cond](malloc)
-		worker.trigger.L = l
+		worker.trigger = &sync.Cond{L: &sync.Mutex{}}
 	}
 }
 
@@ -129,3 +127,13 @@ type serviceUd struct {
 const (
 	threadNone = -1
 )
+
+func getErrorMessage(L *lua.State) string {
+	switch L.Type(-1) {
+	case lua.LUA_TLIGHTUSERDATA:
+		return *(*string)(L.ToUserData(-1))
+	case lua.LUA_TSTRING:
+		return L.ToString(-1)
+	}
+	return "Invalid error message"
+}

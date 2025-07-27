@@ -56,7 +56,7 @@ func (config *ltaskConfig) load(L *lua.State, index int) {
 		var size int
 		log := L.ToLString(-1, &size)
 		if size < 128 {
-			crashLog := makeSlice[byte](malloc, uint64(size+1))
+			crashLog := make([]byte, size+1)
 			copy(crashLog, []byte(log))
 			config.crashLog = crashLog
 		}
