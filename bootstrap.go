@@ -146,6 +146,9 @@ func ltaskBootstrapOpen(L *lua.State) int {
 		{"init_root", ltaskInitRoot},
 		// We don't need `init_socket` here, as it is proceed by Go runtime automatically.
 		{"pack", luaSerdePack},
+		{"unpack", luaSerdeUnpack},
+		{"remove", luaSerdeRemove},
+		{"unpack_remove", luaSerdeUnpackRemove},
 	}
 
 	luaLNewLib(L, l)
