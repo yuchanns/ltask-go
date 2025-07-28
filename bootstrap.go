@@ -80,6 +80,22 @@ func ltaskNewService(L *lua.State) int {
 	return 1
 }
 
+func ltaskInitRoot(L *lua.State) int {
+	task := getPtr[ltask](L, "LTASK_GLOBAL")
+	var id serviceId = L.CheckInteger(1)
+	if id != serviceIdRoot {
+		return L.Errorf("Id should be ROOT(1)")
+	}
+	s := task.services.getService(id)
+	if s == nil {
+		return L.Errorf("Service %d not found", id)
+	}
+	if !s.requiref("ltask.root", ltaskRootOpen, L) {
+		return L.Errorf("Require ltask.root failed: %s", getErrorMessage(L))
+	}
+	return 0
+}
+
 var bootInit atomic.Int32
 
 func ltaskBootstrapOpen(L *lua.State) int {
@@ -90,6 +106,7 @@ func ltaskBootstrapOpen(L *lua.State) int {
 		{"init", ltaskInit},
 		{"new_service", ltaskNewService},
 		{"init_timer", ltaskInitTimer},
+		{"init_root", ltaskInitRoot},
 		// We don't need `init_socket` here, as it is proceed by Go runtime automatically.
 	}
 

@@ -20,6 +20,11 @@ const (
 	serviceStatusDead          = 5
 )
 
+const (
+	serviceIdSystem = 0
+	serviceIdRoot   = 1
+)
+
 type memoryStat struct {
 	count [typeIdCount]int64
 	mem   int64
@@ -60,6 +65,7 @@ func (s *service) init(ud *serviceUd, queueLen int64, pL *lua.State) (ok bool) {
 	s.msg = make(chan *message, queueLen)
 	s.L = L
 	s.rL = L.NewThread()
+	L.Ref(lua.LUA_REGISTRYINDEX)
 	return true
 }
 
