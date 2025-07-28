@@ -1,6 +1,7 @@
 local boot = require("ltask.bootstrap")
 
 local SERVICE_ROOT <const> = 1
+local MESSSAGE_SYSTEM <const> = 0
 
 local function bootstrap_root(initfunc, config)
 	local sid = assert(boot.new_service("root", config.service_source, config.service_chunkname, SERVICE_ROOT))
@@ -11,6 +12,14 @@ local function bootstrap_root(initfunc, config)
 		initfunc = initfunc,
 		name = "root",
 		args = { config },
+	})
+	boot.post_message({
+		from = SERVICE_ROOT,
+		to = SERVICE_ROOT,
+		session = 1, -- 1 for root init
+		type = MESSSAGE_SYSTEM,
+		message = init_msg,
+		size = sz,
 	})
 end
 

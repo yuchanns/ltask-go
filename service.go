@@ -143,6 +143,19 @@ func newServicePool(config *ltaskConfig) (pool *servicePool) {
 	return
 }
 
+func (p *servicePool) postMessage(msg *message) (ok bool) {
+	s := p.getService(msg.to)
+	if s == nil || s.status == serviceStatusDead {
+		return
+	}
+	select {
+	case s.msg <- msg:
+		ok = true
+	default:
+	}
+	return
+}
+
 func (p *servicePool) newService(sid int64) (svcId serviceId) {
 	var id int64
 	if sid != 0 {

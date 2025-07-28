@@ -96,6 +96,42 @@ func ltaskInitRoot(L *lua.State) int {
 	return 0
 }
 
+func checkField(L *lua.State, index int, key string) int64 {
+	typ, _ := L.GetField(index, key)
+	if typ != lua.LUA_TNUMBER {
+		return int64(L.Errorf(".%s should be an integer", key))
+	}
+	v := L.ToInteger(-1)
+	L.Pop(1)
+	return v
+}
+
+func lpostMessage(L *lua.State) int {
+	typ, _ := L.GetField(1, "type")
+	L.CheckType(1, lua.LUA_TTABLE)
+	msg := message{
+		from:    checkField(L, 1, "from"),
+		to:      checkField(L, 1, "to"),
+		session: session(checkField(L, 1, "session")),
+		typ:     typ,
+	}
+	typ, _ = L.GetField(1, "message")
+	if typ != lua.LUA_TNIL {
+		if typ != lua.LUA_TLIGHTUSERDATA {
+			return L.Errorf(".message should be a pointer")
+		}
+		msg.msg = L.ToUserData(-1)
+		L.Pop(1)
+		msg.sz = checkField(L, 1, "size")
+	}
+	task := getPtr[ltask](L, "LTASK_GLOBAL")
+	if !task.services.postMessage(&msg) {
+		return L.Errorf("push message failed")
+	}
+	// TODO: checkMessage
+	return 0
+}
+
 var bootInit atomic.Int32
 
 func ltaskBootstrapOpen(L *lua.State) int {
@@ -104,6 +140,7 @@ func ltaskBootstrapOpen(L *lua.State) int {
 	}
 	l := []luaLReg{
 		{"init", ltaskInit},
+		{"post_message", lpostMessage},
 		{"new_service", ltaskNewService},
 		{"init_timer", ltaskInitTimer},
 		{"init_root", ltaskInitRoot},
