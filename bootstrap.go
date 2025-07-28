@@ -70,7 +70,7 @@ func ltaskNewService(L *lua.State) int {
 
 	id := task.services.newService(sid)
 
-	if !task.newService(L, id, label, source, chunkName, workerId) {
+	if !task.initService(L, id, label, source, chunkName, workerId) {
 		L.PushBoolean(false)
 		L.Insert(-2)
 		return 2

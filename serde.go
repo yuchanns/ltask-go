@@ -29,10 +29,19 @@ const (
 	serdeTypeNumberQword = 6
 	serdeTypeNumberReal  = 8
 
+	serdeTypeUserData        = 2
+	serdeTypeUserDataPointer = 0
+	serdeTypeUserDataCFunc   = 1
+
 	serdeTypeShortString = 3
 	serdeTypeLongString  = 4
 
-	serdeTypeTable = 5
+	serdeTypeTable     = 5
+	serdeTypeTableMark = 6
+	serdeTypeRef       = 7
+
+	maxCookie    = 32
+	extendNumber = maxCookie - 1
 )
 
 func combineType(t, v uint8) uint8 {
@@ -93,7 +102,11 @@ func (wb *writeBlock) packOne(L *lua.State, index int) {
 			if x == 0 {
 				tag := combineType(serdeTypeNumber, serdeTypeNumberZero)
 				wb.writeByte(tag)
-			} else if x < 0 || x > 0xFFFFFFFF {
+			} else if x < 0 {
+				tag := combineType(serdeTypeNumber, serdeTypeNumberDword)
+				wb.writeByte(tag)
+				wb.writeInt32(int32(x))
+			} else if x > 0x7FFFFFFF {
 				tag := combineType(serdeTypeNumber, serdeTypeNumberQword)
 				wb.writeByte(tag)
 				wb.writeInt64(x)
@@ -129,7 +142,7 @@ func (wb *writeBlock) packOne(L *lua.State, index int) {
 	case lua.LUA_TSTRING:
 		str := L.ToString(index)
 		length := len(str)
-		if length < 32 {
+		if length < maxCookie {
 			tag := combineType(serdeTypeShortString, uint8(length))
 			wb.writeByte(tag)
 			if length > 0 {
@@ -148,13 +161,13 @@ func (wb *writeBlock) packOne(L *lua.State, index int) {
 		}
 	case lua.LUA_TLIGHTUSERDATA:
 		udPtr := L.ToUserData(index)
-		tag := combineType(7 /* TYPE_USERDATA */, 0 /* POINTER */)
+		tag := combineType(serdeTypeUserData, serdeTypeUserDataPointer)
 		wb.writeByte(tag)
 		ptrBytes := (*[unsafe.Sizeof(udPtr)]byte)(unsafe.Pointer(&udPtr))[:]
 		wb.writeBytes(ptrBytes)
 	case lua.LUA_TFUNCTION:
 		fnPtr := L.ToCFunction(index)
-		tag := combineType(7 /* TYPE_USERDATA */, 1 /* CFUNCTION */)
+		tag := combineType(serdeTypeUserData, serdeTypeUserDataCFunc)
 		wb.writeByte(tag)
 		fnBytes := (*[unsafe.Sizeof(fnPtr)]byte)(unsafe.Pointer(&fnPtr))[:]
 		wb.writeBytes(fnBytes)
@@ -164,7 +177,7 @@ func (wb *writeBlock) packOne(L *lua.State, index int) {
 		}
 		objPtr := L.ToPointer(index)
 		if id, ok := wb.reference[objPtr]; ok {
-			tag := combineType(7 /* TYPE_REF */, 31 /* EXTEND_NUMBER */)
+			tag := combineType(serdeTypeRef, extendNumber)
 			wb.writeByte(tag)
 			wb.writeInt32(int32(id))
 			return
@@ -188,8 +201,8 @@ func (wb *writeBlock) packOne(L *lua.State, index int) {
 func (wb *writeBlock) packTable(L *lua.State, index int) {
 	arraySize := L.RawLen(index)
 	var tag uint8
-	if arraySize >= 31 {
-		tag = combineType(serdeTypeTable, 31)
+	if arraySize >= extendNumber {
+		tag = combineType(serdeTypeTable, extendNumber)
 		wb.writeByte(tag)
 		wb.writeInt32(int32(arraySize))
 	} else {

@@ -244,7 +244,7 @@ func requireModule(L *lua.State) int {
 	return 0
 }
 
-func (task *ltask) newService(L *lua.State, id serviceId, label string,
+func (task *ltask) initService(L *lua.State, id serviceId, label string,
 	source string, chunkName string, workerId int64) (ok bool) {
 	ud := &serviceUd{
 		task: task,
