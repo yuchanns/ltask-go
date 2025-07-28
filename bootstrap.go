@@ -63,15 +63,14 @@ func ltaskInitTimer(L *lua.State) int {
 func ltaskNewService(L *lua.State) int {
 	task := getPtr[ltask](L, "LTASK_GLOBAL")
 	label := L.CheckString(1)
-	var sourceSz int
-	source := L.CheckLString(2, &sourceSz)
+	source := L.CheckString(2)
 	chunkName := L.CheckString(3)
 	sid := L.OptInteger(4, 0)
 	workerId := L.OptInteger(5, -1)
 
 	id := task.services.newService(sid)
 
-	if !task.newService(L, id, label, source, sourceSz, chunkName, workerId) {
+	if !task.newService(L, id, label, source, chunkName, workerId) {
 		L.PushBoolean(false)
 		L.Insert(-2)
 		return 2
@@ -83,7 +82,7 @@ func ltaskNewService(L *lua.State) int {
 
 var bootInit atomic.Int32
 
-func ltaskBootstrap(L *lua.State) int {
+func ltaskBootstrapOpen(L *lua.State) int {
 	if bootInit.Add(1) != 1 {
 		return L.Errorf("ltask.bootstrap can only require once")
 	}
