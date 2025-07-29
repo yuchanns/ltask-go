@@ -41,6 +41,13 @@ for i = 1, #t2 do
 end
 assert(t2.a == "hello")
 assert(t2.b == "world")
+local t3 = unpack_remove(msg, sz)
+assert(#t3 == 3)
+for i = 1, #t3 do
+	assert(t3[i] == t[i])
+end
+assert(t3.a == "hello")
+assert(t3.b == "world")
 	`)
 	assert.NoError(err)
 

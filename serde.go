@@ -781,7 +781,7 @@ func LuaSerdePack(L *lua.State) int {
 	buffer := unsafe.Slice((*byte)(unsafe.Pointer(ptr)), sz)
 	copy(buffer, buf)
 
-	L.PushLightUserData(unsafe.Pointer(ptr))
+	L.PushLightUserData(ptr)
 	L.PushInteger(int64(sz))
 	return 2
 }
