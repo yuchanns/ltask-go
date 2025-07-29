@@ -44,8 +44,6 @@ func (s *Suite) TearDown() {
 }
 
 func TestSuite(t *testing.T) {
-	t.Parallel()
-
 	assert := require.New(t)
 
 	suite := &Suite{}
@@ -58,6 +56,15 @@ func TestSuite(t *testing.T) {
 	testDir := "testdata"
 	ents, err := os.ReadDir(testDir)
 	assert.NoError(err)
+
+	L, err := suite.lib.NewState()
+	assert.NoError(err)
+
+	L.OpenLibs()
+
+	ltask.OpenLibs(L, suite.lib)
+
+	t.Cleanup(L.Close)
 
 	for _, ent := range ents {
 		if ent.IsDir() {
@@ -74,17 +81,7 @@ func TestSuite(t *testing.T) {
 		assert.NoError(err)
 
 		t.Run(sname, func(t *testing.T) {
-			t.Parallel()
 			assert := require.New(t)
-
-			L, err := suite.lib.NewState()
-			assert.NoError(err)
-
-			L.OpenLibs()
-
-			ltask.OpenLibs(L, suite.lib)
-
-			t.Cleanup(L.Close)
 
 			assert.NoError(L.DoString(string(scode)))
 		})
@@ -96,15 +93,7 @@ func TestSuite(t *testing.T) {
 		method := tt.Method(i)
 		if testFunc, ok := method.Func.Interface().(func(*Suite, *require.Assertions, *lua.State)); ok {
 			t.Run(strings.TrimPrefix(method.Name, "Test"), func(t *testing.T) {
-				t.Parallel()
 				assert := require.New(t)
-
-				L, err := suite.lib.NewState()
-				assert.NoError(err)
-
-				L.OpenLibs()
-
-				t.Cleanup(L.Close)
 
 				testFunc(suite, assert, L)
 			})
