@@ -762,7 +762,7 @@ func serdeUnpackPtr(L *lua.State, buffer unsafe.Pointer) int {
 	return L.GetTop() - top
 }
 
-func luaSerdePack(L *lua.State) int {
+func LuaSerdePack(L *lua.State) int {
 	buf := serdePack(L, 0)
 	sz := len(buf)
 
@@ -775,7 +775,7 @@ func luaSerdePack(L *lua.State) int {
 	return 2
 }
 
-func luaSerdeUnpack(L *lua.State) int {
+func LuaSerdeUnpack(L *lua.State) int {
 	if L.IsNoneOrNil(1) {
 		return 0
 	}
@@ -790,7 +790,7 @@ func luaSerdeUnpack(L *lua.State) int {
 	return serdeUnpack(L, data)
 }
 
-func luaSerdeUnpackRemove(L *lua.State) int {
+func LuaSerdeUnpackRemove(L *lua.State) int {
 	if L.IsNoneOrNil(1) {
 		return 0
 	}
@@ -803,7 +803,7 @@ func luaSerdeUnpackRemove(L *lua.State) int {
 	return serdeUnpackPtr(L, buffer)
 }
 
-func luaSerdeRemove(L *lua.State) int {
+func LuaSerdeRemove(L *lua.State) int {
 	if L.IsNoneOrNil(1) {
 		return 0
 	}
