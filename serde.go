@@ -97,6 +97,10 @@ func (wb *writeBlock) writeInt64(x int64) {
 	_ = binary.Write(wb.buf, binary.LittleEndian, x)
 }
 
+func (wb *writeBlock) writeUint64(x uint64) {
+	_ = binary.Write(wb.buf, binary.LittleEndian, x)
+}
+
 func (wb *writeBlock) writeFloat64(x float64) {
 	_ = binary.Write(wb.buf, binary.LittleEndian, x)
 }
@@ -164,8 +168,7 @@ func (wb *writeBlock) writeString(str string) {
 func (wb *writeBlock) writePointer(ptr unsafe.Pointer, subtype uint8) {
 	tag := combineType(serdeTypeUserData, subtype)
 	wb.writeByte(tag)
-	ptrBytes := (*[unsafe.Sizeof(ptr)]byte)(unsafe.Pointer(&ptr))[:]
-	wb.writeBytes(ptrBytes)
+	wb.writeUint64(uint64(uintptr(ptr)))
 }
 
 func (wb *writeBlock) writeNil() {
@@ -397,11 +400,11 @@ func (wb *writeBlock) packOne(L *lua.State, index int) {
 		udPtr := L.ToUserData(index)
 		wb.writePointer(udPtr, serdeTypeUserDataPointer)
 	case lua.LUA_TFUNCTION:
-		fn := L.ToGoFunction(index)
+		fn := L.ToCFunction(index)
 		if fn == nil || L.GetUpValue(index, 1) != "" {
 			L.Errorf("Only light C function can be serialized")
 		}
-		wb.writePointer(unsafe.Pointer(&fn), serdeTypeUserDataCFunc)
+		wb.writePointer(fn, serdeTypeUserDataCFunc)
 	case lua.LUA_TTABLE:
 		if index < 0 {
 			index = L.GetTop() + index + 1
@@ -487,6 +490,14 @@ func (rb *readBlock) readUint32() (uint32, bool) {
 	return binary.LittleEndian.Uint32(data), true
 }
 
+func (rb *readBlock) readUint64() (uint64, bool) {
+	data := rb.read(8)
+	if data == nil {
+		return 0, false
+	}
+	return binary.LittleEndian.Uint64(data), true
+}
+
 func (rb *readBlock) readInt32() (int32, bool) {
 	val, ok := rb.readUint32()
 	return int32(val), ok
@@ -509,11 +520,11 @@ func (rb *readBlock) readFloat64() (float64, bool) {
 }
 
 func (rb *readBlock) readPointer() (unsafe.Pointer, bool) {
-	data := rb.read(int(unsafe.Sizeof(uintptr(0))))
-	if data == nil {
+	data, ok := rb.readUint64()
+	if !ok {
 		return nil, false
 	}
-	return *(*unsafe.Pointer)(unsafe.Pointer(&data[0])), true
+	return unsafe.Pointer(uintptr(data)), true
 }
 
 func (rb *readBlock) getInteger(L *lua.State, cookie uint8) int64 {
@@ -664,8 +675,8 @@ func (rb *readBlock) pushValue(L *lua.State, typ, cookie uint8) {
 		if cookie == serdeTypeUserDataPointer {
 			L.PushLightUserData(rb.getPointer(L))
 		} else if cookie == serdeTypeUserDataCFunc {
-			fnPtr := rb.getPointer(L)
-			L.PushGoFunction(*(*lua.GoFunc)(fnPtr))
+			fn := rb.getPointer(L)
+			L.PushCFunction(fn)
 		} else {
 			L.Errorf("Invalid userdata")
 		}
