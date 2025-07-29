@@ -190,15 +190,38 @@ func ltaskWait(L *lua.State) int {
 
 	for i := range ctx.task.event {
 		close(ctx.task.event[i])
+		for range ctx.task.event[i] {
+		}
 		ctx.task.event[i] = nil
 	}
 
 	ctx.task.externalLastMessage = nil
 	if ctx.task.externalMessage != nil {
-	close(ctx.task.externalMessage)
-	ctx.task.externalMessage = nil
+		close(ctx.task.externalMessage)
+		for range ctx.task.externalMessage {
+		}
+		ctx.task.externalMessage = nil
 	}
 
+	return 0
+}
+
+func ltaskDeinit(L *lua.State) int {
+	task := getPtr[ltask](L, "LTASK_GLOBAL")
+
+	for i := range task.workers {
+		w := &task.workers[i]
+		w.destroy()
+	}
+	task.services.destroy()
+	close(task.schedule)
+	for range task.schedule {
+	}
+	task.schedule = nil
+	task.timer.destroy()
+
+	L.PushNil()
+	L.SetField(lua.LUA_REGISTRYINDEX, "LTASK_GLOBAL")
 	return 0
 }
 
@@ -222,6 +245,7 @@ func ltaskBootstrapOpen(L *lua.State) int {
 	}
 	l := []luaLReg{
 		{"init", ltaskInit},
+		{"deinit", ltaskDeinit},
 		{"run", ltaskRun},
 		{"wait", ltaskWait},
 		{"post_message", lpostMessage},

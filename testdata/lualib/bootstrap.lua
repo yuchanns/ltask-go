@@ -7,6 +7,7 @@
 ---@field post_message fun(msg: ltask.message)
 ---@field run fun(mainthread: integer|nil): userdata
 ---@field wait fun(ctx: userdata)
+---@field deinit fun()
 local boot = require("ltask.bootstrap")
 
 ---@class ltask.message
@@ -61,7 +62,7 @@ end
 ---@param ctx userdata
 local function wait(ctx)
   boot.wait(ctx)
-  -- boot.deinit()
+  boot.deinit()
 end
 
 return {

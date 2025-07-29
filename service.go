@@ -113,6 +113,9 @@ func (s *service) loadString(source string, chunkName string) (err error) {
 }
 
 func (s *service) close() {
+	if s == nil {
+		return
+	}
 	if s.L != nil {
 		s.L.Close()
 	}
@@ -195,6 +198,17 @@ func (p *servicePool) getService(id int64) *service {
 
 func (p *servicePool) setService(svc *service) {
 	p.s[svc.id&p.mask] = svc
+}
+
+func (p *servicePool) destroy() {
+	if p == nil {
+		return
+	}
+	for i := range p.s {
+		p.s[i].close()
+		p.s[i] = nil
+	}
+	p = nil
 }
 
 func initService(L *lua.State) int {
