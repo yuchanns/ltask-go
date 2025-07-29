@@ -91,6 +91,9 @@ assert(result2() == 42)
 	testPtr1 := mem.Alloc(1024 * 1024)
 	testPtr2 := mem.Alloc(1024)
 
+	defer mem.Free(testPtr1)
+	defer mem.Free(testPtr2)
+
 	L.PushLightUserData(testPtr1)
 	L.SetGlobal("test_ptr1")
 	L.PushLightUserData(testPtr2)
@@ -294,6 +297,7 @@ func (s *Suite) TestSerdeFunctionPerformance(assert *require.Assertions, L *lua.
 		L.SetGlobal("test_func_" + string(rune('0'+i)))
 
 		ptr := mem.Alloc(1024)
+		defer mem.Free(ptr)
 		L.PushLightUserData(ptr)
 		L.SetGlobal("test_ptr_" + string(rune('0'+i)))
 	}
