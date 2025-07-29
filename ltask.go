@@ -15,12 +15,19 @@ func OpenLibs(L *lua.State, lib *lua.Lib) {
 	_, _ = L.GetField(-1, "preload")
 
 	l := []luaLReg{
-		{"ltask.bootstrap", ltaskBootstrap},
+		{"ltask.bootstrap", ltaskBootstrapOpen},
 	}
 	luaLSetFuncs(L, l)
 	L.Pop(2)
 
 	luaLib = lib
+}
+
+func ltaskOpen(L *lua.State) int {
+	l := []luaLReg{}
+
+	luaLNewLib(L, l)
+	return 1
 }
 
 type luaLReg struct {
@@ -69,6 +76,11 @@ func (task *ltask) init(L *lua.State, config *ltaskConfig) {
 
 	task.services = newServicePool(config)
 	task.schedule = make(chan int, config.maxService)
+	// Windows compatiblity: initialize the timer with a nil value
+	// to clear any wired data in the memory.
+	task.timer = nil
+	task.externalMessage = nil
+
 	if config.externalQueue > 0 {
 		task.externalMessage = make(chan any, config.externalQueue)
 	}
@@ -86,9 +98,6 @@ func (task *ltask) init(L *lua.State, config *ltaskConfig) {
 		atomic.StoreInt32(&task.eventInit[i], 0)
 	}
 	task.event = event
-	// Windows compatiblity: initialize the timer with a nil value
-	// to clear any wired data in the memory.
-	task.timer = nil
 }
 
 func (task *ltask) initWorker(L *lua.State) {

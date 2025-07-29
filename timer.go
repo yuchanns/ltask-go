@@ -23,3 +23,7 @@ func newTimer() *timer {
 func (t *timer) init() {
 	// TODO: Initialize timer
 }
+
+func (t *timer) destroy() {
+	// TODO: Cleanup timer resources
+}

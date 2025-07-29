@@ -4,6 +4,7 @@ go 1.24.3
 
 require (
 	github.com/iancoleman/strcase v0.3.0
+	github.com/smasher164/mem v0.0.0-20200311200026-6e9ed23f934d
 	github.com/stretchr/testify v1.10.0
 	go.yuchanns.xyz/lua v0.0.0-20250727075619-463d1051632b
 )

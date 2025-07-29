@@ -20,6 +20,11 @@ const (
 	serviceStatusDead          = 5
 )
 
+const (
+	serviceIdSystem = 0
+	serviceIdRoot   = 1
+)
+
 type memoryStat struct {
 	count [typeIdCount]int64
 	mem   int64
@@ -42,7 +47,75 @@ type service struct {
 	clock         uint64
 }
 
+func (s *service) init(ud *serviceUd, queueLen int64, pL *lua.State) (ok bool) {
+	// TODO: compatible 505
+	// malloc
+	L, err := luaLib.NewState()
+	if err != nil {
+		return
+	}
+	L.PushGoFunction(initService)
+	L.PushLightUserData(ud)
+	L.PushInteger(int64(unsafe.Sizeof(*ud)))
+	if err := L.PCall(2, 0, 0); err != nil {
+		errorMessage(L, pL, "Init lua state error")
+		L.Close()
+		return
+	}
+	s.msg = make(chan *message, queueLen)
+	s.L = L
+	s.rL = L.NewThread()
+	L.Ref(lua.LUA_REGISTRYINDEX)
+	return true
+}
+
+func (s *service) requiref(name string, fn lua.GoFunc, pL *lua.State) (ok bool) {
+	if s.rL == nil {
+		errorMessage(nil, pL, "requiref: No service")
+		return false
+	}
+	L := s.rL
+	L.PushGoFunction(requireModule)
+	L.PushLightUserData(&name)
+	L.PushLightUserData(&fn)
+	if L.PCall(2, 0, 0) != nil {
+		errorMessage(L, pL, "requiref: pcall error")
+		L.Pop(1)
+		return false
+	}
+	return true
+}
+
+func (s *service) setBinding(workerThread int64) {
+	s.bindingThread = workerThread
+}
+
+func (s *service) setLabel(label string) (ok bool) {
+	if len(label) > 32 {
+		label = label[:32]
+	}
+	copy(s.label[:], label)
+	return true
+}
+
+func (s *service) loadString(source string, chunkName string) (err error) {
+	if s.L == nil {
+		err = fmt.Errorf("Init service first")
+		return
+	}
+	L := s.L
+	if err = L.LoadBuffer([]byte(source), chunkName); err != nil {
+		s.status = serviceStatusDead
+		return
+	}
+	s.status = serviceStatusIdle
+	return
+}
+
 func (s *service) close() {
+	if s == nil {
+		return
+	}
 	if s.L != nil {
 		s.L.Close()
 	}
@@ -69,6 +142,19 @@ func newServicePool(config *ltaskConfig) (pool *servicePool) {
 		queueLen: config.queueSending,
 		id:       typeIdCount,
 		s:        make([]*service, config.maxService),
+	}
+	return
+}
+
+func (p *servicePool) postMessage(msg *message) (ok bool) {
+	s := p.getService(msg.to)
+	if s == nil || s.status == serviceStatusDead {
+		return
+	}
+	select {
+	case s.msg <- msg:
+		ok = true
+	default:
 	}
 	return
 }
@@ -114,6 +200,17 @@ func (p *servicePool) setService(svc *service) {
 	p.s[svc.id&p.mask] = svc
 }
 
+func (p *servicePool) destroy() {
+	if p == nil {
+		return
+	}
+	for i := range p.s {
+		p.s[i].close()
+		p.s[i] = nil
+	}
+	p = nil
+}
+
 func initService(L *lua.State) int {
 	// ud := (*byte)(L.ToUserData(1))
 	// size := L.ToInteger(2)
@@ -145,28 +242,6 @@ func errorMessage(fromL, toL *lua.State, msg string) {
 	toL.PushLightUserData(unsafe.Pointer(&msg))
 }
 
-func (p *servicePool) initService(ud *serviceUd, pL *lua.State) (ok bool) {
-	s := p.getService(ud.id)
-	// TODO: compatible 505
-	// malloc
-	L, err := luaLib.NewState()
-	if err != nil {
-		return
-	}
-	L.PushGoFunction(initService)
-	L.PushLightUserData(ud)
-	L.PushInteger(int64(unsafe.Sizeof(*ud)))
-	if err := L.PCall(2, 0, 0); err != nil {
-		errorMessage(L, pL, "Init lua state error")
-		L.Close()
-		return
-	}
-	s.msg = make(chan *message, p.queueLen)
-	s.L = L
-	s.rL = L.NewThread()
-	return true
-}
-
 func (p *servicePool) deleteService(id serviceId) {
 	s := p.getService(id)
 	if s == nil {
@@ -176,15 +251,38 @@ func (p *servicePool) deleteService(id serviceId) {
 	s.close()
 }
 
-func (task *ltask) newService(L *lua.State, id serviceId, label string,
-	source string, sourceSz int, chunkName string, workerId int64) (ok bool) {
+func requireModule(L *lua.State) int {
+	name := *(*string)(L.ToUserData(1))
+	fn := *(*lua.GoFunc)(L.ToUserData(2))
+	L.Requiref(name, fn, false)
+	return 0
+}
+
+func (task *ltask) initService(L *lua.State, id serviceId, label string,
+	source string, chunkName string, workerId int64) (ok bool) {
 	ud := &serviceUd{
 		task: task,
 		id:   id,
 	}
-	if !task.services.initService(ud, L) {
+	s := task.services.getService(id)
+	if s == nil {
+		L.PushString(fmt.Sprintf("Service %d not found", id))
+		return false
+	}
+	if !s.init(ud, task.services.queueLen, L) || !s.requiref("ltask", ltaskOpen, L) {
 		task.services.deleteService(id)
 		L.PushString(fmt.Sprintf("New service fail: %s", getErrorMessage(L)))
+		return false
+	}
+	s.setBinding(workerId)
+	if !s.setLabel(label) {
+		task.services.deleteService(id)
+		L.PushString(fmt.Sprintf("Set label fail: %s", getErrorMessage(L)))
+		return false
+	}
+	if err := s.loadString(source, chunkName); err != nil {
+		task.services.deleteService(id)
+		L.PushString(fmt.Sprintf("%s", err))
 		return false
 	}
 	return true

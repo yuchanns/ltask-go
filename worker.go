@@ -26,3 +26,7 @@ type workerThread struct {
 	busy         int64
 	trigger      *sync.Cond
 }
+
+func (w *workerThread) destroy() {
+	w.trigger = nil
+}

@@ -1,13 +1,15 @@
 package ltask
 
-type session uint64
+import "unsafe"
+
+type session = uint64
 
 type message struct {
 	from    serviceId
 	to      serviceId
 	session session
 	typ     int
-	msg     any // TODO: what type is this?
+	msg     unsafe.Pointer
 	sz      int64
 }
 
