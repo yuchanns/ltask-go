@@ -76,6 +76,11 @@ func (task *ltask) init(L *lua.State, config *ltaskConfig) {
 
 	task.services = newServicePool(config)
 	task.schedule = make(chan int, config.maxService)
+	// Windows compatiblity: initialize the timer with a nil value
+	// to clear any wired data in the memory.
+	task.timer = nil
+	task.externalMessage = nil
+
 	if config.externalQueue > 0 {
 		task.externalMessage = make(chan any, config.externalQueue)
 	}
@@ -93,9 +98,6 @@ func (task *ltask) init(L *lua.State, config *ltaskConfig) {
 		atomic.StoreInt32(&task.eventInit[i], 0)
 	}
 	task.event = event
-	// Windows compatiblity: initialize the timer with a nil value
-	// to clear any wired data in the memory.
-	task.timer = nil
 }
 
 func (task *ltask) initWorker(L *lua.State) {
