@@ -104,8 +104,6 @@ func TestSuite(t *testing.T) {
 
 				L.OpenLibs()
 
-				ltask.OpenLibs(L, suite.lib)
-
 				t.Cleanup(L.Close)
 
 				testFunc(suite, assert, L)
