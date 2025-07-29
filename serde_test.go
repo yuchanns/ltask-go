@@ -1,10 +1,10 @@
 package ltask_test
 
 import (
+	"github.com/smasher164/mem"
 	"github.com/stretchr/testify/require"
 	"go.yuchanns.xyz/ltask"
 	"go.yuchanns.xyz/lua"
-	"unsafe"
 )
 
 func (s *Suite) TestSerde(assert *require.Assertions, L *lua.State) {
@@ -85,8 +85,11 @@ assert(result2() == 42)
 		`)
 	assert.NoError(err)
 
-	testPtr1 := unsafe.Pointer(&testFunc1)
-	testPtr2 := unsafe.Pointer(&testFunc2)
+	// In general, light userdata should be alived for the duration of the Lua state.
+	// If we use Go pointers here, it cannot pass the checkptr
+	// So we use mem.Alloc to allocate memory for the light userdata.
+	testPtr1 := mem.Alloc(1024 * 1024)
+	testPtr2 := mem.Alloc(1024)
 
 	L.PushLightUserData(testPtr1)
 	L.SetGlobal("test_ptr1")
@@ -290,7 +293,7 @@ func (s *Suite) TestSerdeFunctionPerformance(assert *require.Assertions, L *lua.
 		L.PushGoFunction(testFunc)
 		L.SetGlobal("test_func_" + string(rune('0'+i)))
 
-		ptr := unsafe.Pointer(&testFunc)
+		ptr := mem.Alloc(1024)
 		L.PushLightUserData(ptr)
 		L.SetGlobal("test_ptr_" + string(rune('0'+i)))
 	}
