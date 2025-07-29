@@ -2,6 +2,7 @@ package ltask
 
 import (
 	"fmt"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"unsafe"
@@ -177,6 +178,9 @@ func ltaskRun(L *lua.State) int {
 	}
 
 	if useMainThread && mainThread != nil {
+		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
+
 		threadWorker(mainThread)
 	}
 
