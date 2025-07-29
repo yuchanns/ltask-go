@@ -756,7 +756,7 @@ func serdePack(L *lua.State, from int) []byte {
 func serdeUnpackPtr(L *lua.State, buffer unsafe.Pointer) int {
 	top := L.GetTop()
 
-	length := *(*uint32)(buffer)
+	length := binary.LittleEndian.Uint32(unsafe.Slice((*byte)(unsafe.Pointer(buffer)), 4))
 	data := unsafe.Slice((*byte)(unsafe.Add(buffer, 4)), int(length))
 
 	defer mem.Free(buffer)
@@ -773,16 +773,21 @@ func serdeUnpackPtr(L *lua.State, buffer unsafe.Pointer) int {
 	return L.GetTop() - top
 }
 
+func alignUp(n, align int) int {
+	return (n + align - 1) &^ (align - 1)
+}
+
 func LuaSerdePack(L *lua.State) int {
 	buf := serdePack(L, 0)
 	sz := len(buf)
 
-	ptr := mem.Alloc(uint(sz))
-	buffer := unsafe.Slice((*byte)(unsafe.Pointer(ptr)), sz)
+	alignedSz := alignUp(sz, 8)
+	ptr := mem.Alloc(uint(alignedSz))
+	buffer := unsafe.Slice((*byte)(unsafe.Pointer(ptr)), alignedSz)
 	copy(buffer, buf)
 
 	L.PushLightUserData(ptr)
-	L.PushInteger(int64(sz))
+	L.PushInteger(int64(alignedSz))
 	return 2
 }
 
@@ -795,7 +800,7 @@ func LuaSerdeUnpack(L *lua.State) int {
 	buffer := L.ToUserData(1)
 	L.SetTop(0)
 
-	length := *(*uint32)(buffer)
+	length := binary.LittleEndian.Uint32(unsafe.Slice((*byte)(unsafe.Pointer(buffer)), 4))
 	data := unsafe.Slice((*byte)(unsafe.Add(buffer, 4)), int(length))
 
 	return serdeUnpack(L, data)
