@@ -1,6 +1,8 @@
 package ltask
 
 import (
+	"fmt"
+	"sync"
 	"sync/atomic"
 	"unsafe"
 
@@ -132,6 +134,86 @@ func lpostMessage(L *lua.State) int {
 	return 0
 }
 
+type taskContext struct {
+	task *ltask
+	wg   *sync.WaitGroup
+}
+
+func ltaskRun(L *lua.State) int {
+	task := getPtr[ltask](L, "LTASK_GLOBAL")
+	var (
+		useMainThread bool
+		mainThreadId  int64
+	)
+	if L.IsInteger(1) {
+		useMainThread = true
+		mainThreadId = L.CheckInteger(1)
+		if mainThreadId >= 0 && mainThreadId >= task.config.worker {
+			return L.Errorf("Invalid mainthread %d", mainThreadId)
+		}
+	}
+
+	var ctx *taskContext
+	ctx = (*taskContext)(L.NewUserDataUv(int(unsafe.Sizeof(*ctx)), 0))
+
+	ctx.task = task
+	wg := &sync.WaitGroup{}
+	ctx.wg = wg
+
+	var mainThread *workerThread
+
+	for i := range task.workers {
+		if useMainThread && int64(i) == mainThreadId {
+			mainThread = &task.workers[i]
+			continue
+		}
+
+		wg.Add(1)
+		go func(w *workerThread) {
+			defer wg.Done()
+
+			threadWorker(w)
+		}(&task.workers[i])
+	}
+
+	if useMainThread && mainThread != nil {
+		threadWorker(mainThread)
+	}
+
+	return 1
+}
+
+func ltaskWait(L *lua.State) int {
+	L.CheckType(1, lua.LUA_TUSERDATA)
+	ctx := (*taskContext)(L.ToUserData(1))
+	ctx.wg.Wait()
+
+	for i := range ctx.task.event {
+		close(ctx.task.event[i])
+		ctx.task.event[i] = nil
+	}
+
+	ctx.task.externalLastMessage = nil
+	if ctx.task.externalMessage != nil {
+	close(ctx.task.externalMessage)
+	ctx.task.externalMessage = nil
+	}
+
+	return 0
+}
+
+func threadWorker(w *workerThread) {
+	// p := w.task.services
+	atomic.AddInt32(&w.task.activeWorker, 1)
+	fmt.Println("doing job in worker")
+
+	// for {
+	// 	if w.termSignal == 0 {
+	// 		break
+	// 	}
+	// }
+}
+
 var bootInit atomic.Int32
 
 func ltaskBootstrapOpen(L *lua.State) int {
@@ -140,6 +222,8 @@ func ltaskBootstrapOpen(L *lua.State) int {
 	}
 	l := []luaLReg{
 		{"init", ltaskInit},
+		{"run", ltaskRun},
+		{"wait", ltaskWait},
 		{"post_message", lpostMessage},
 		{"new_service", ltaskNewService},
 		{"init_timer", ltaskInitTimer},
