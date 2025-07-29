@@ -1,8 +1,25 @@
+---@class ltask.bootstrap
+---@field init fun(config: table)
+---@field init_timer fun()
+---@field init_root fun(sid: integer)
+---@field new_service fun(name: string, source: string, chunkname: string, sid: integer): integer
+---@field pack fun(name: string, args: table): string, integer
+---@field post_message fun(msg: ltask.message)
 local boot = require("ltask.bootstrap")
+
+---@class ltask.message
+---@field from integer
+---@field to integer
+---@field session integer
+---@field type integer
+---@field message string
+---@field size integer
 
 local SERVICE_ROOT <const> = 1
 local MESSSAGE_SYSTEM <const> = 0
 
+---@param initfunc string
+---@param config bootconfig
 local function bootstrap_root(initfunc, config)
 	local sid = assert(boot.new_service("root", config.service_source, config.service_chunkname, SERVICE_ROOT))
 	assert(sid == SERVICE_ROOT)
@@ -23,6 +40,13 @@ local function bootstrap_root(initfunc, config)
 	})
 end
 
+---@param config bootconfig
+---@class bootconfig
+---@field core table
+---@field root_initfunc string
+---@field root table
+---@field service_source string
+---@field service_chunkname string
 local function start(config)
 	boot.init(config.core)
 	boot.init_timer()
