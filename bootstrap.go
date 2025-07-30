@@ -7,6 +7,7 @@ import (
 	"unsafe"
 
 	"github.com/phuslu/log"
+	"github.com/smasher164/mem"
 	"go.yuchanns.xyz/lua"
 )
 
@@ -193,17 +194,19 @@ func ltaskWait(L *lua.State) int {
 	ctx.wg.Wait()
 
 	for i := range ctx.task.event {
-		close(ctx.task.event[i])
-		for range ctx.task.event[i] {
+		for ctx.task.event[i].Len() > 0 {
+			ctx.task.event[i].Pop()
 		}
+		mem.Free(unsafe.Pointer(ctx.task.event[i]))
 		ctx.task.event[i] = nil
 	}
 
 	ctx.task.externalLastMessage = nil
 	if ctx.task.externalMessage != nil {
-		close(ctx.task.externalMessage)
-		for range ctx.task.externalMessage {
+		for ctx.task.externalMessage.Len() > 0 {
+			ctx.task.externalMessage.Pop()
 		}
+		mem.Free(unsafe.Pointer(ctx.task.externalMessage))
 		ctx.task.externalMessage = nil
 	}
 
@@ -218,9 +221,10 @@ func ltaskDeinit(L *lua.State) int {
 		w.destroy()
 	}
 	task.services.destroy()
-	close(task.schedule)
-	for range task.schedule {
+	for task.schedule.Len() > 0 {
+		task.schedule.Pop()
 	}
+	mem.Free(unsafe.Pointer(task.schedule))
 	task.schedule = nil
 	task.timer.destroy()
 

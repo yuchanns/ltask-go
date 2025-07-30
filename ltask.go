@@ -5,7 +5,9 @@ import (
 	"sync/atomic"
 	"unsafe"
 
+	"github.com/smasher164/mem"
 	"go.yuchanns.xyz/lua"
+	"go.yuchanns.xyz/xxchan"
 )
 
 var luaLib *lua.Lib
@@ -52,12 +54,12 @@ type ltask struct {
 	config    *ltaskConfig
 	workers   []workerThread
 	eventInit []atomicInt
-	event     []chan struct{}
+	event     []*xxchan.Channel[struct{}]
 	services  *servicePool
-	schedule  chan int
+	schedule  *xxchan.Channel[int]
 	timer     *timer
 	// TODO: logqueue?
-	externalMessage     chan unsafe.Pointer
+	externalMessage     *xxchan.Channel[unsafe.Pointer]
 	externalLastMessage *message
 	scheduleOwner       atomicInt
 	activeWorker        atomicInt
@@ -75,25 +77,28 @@ func (task *ltask) init(L *lua.State, config *ltaskConfig) {
 	task.initWorker(L)
 
 	task.services = newServicePool(config)
-	task.schedule = make(chan int, config.maxService)
+	ptr := mem.Alloc(uint(xxchan.Sizeof[int](int(config.maxService))))
+	task.schedule = xxchan.Make[int](ptr, int(config.maxService))
 	// Windows compatiblity: initialize the timer with a nil value
 	// to clear any wired data in the memory.
 	task.timer = nil
 	task.externalMessage = nil
 
 	if config.externalQueue > 0 {
-		task.externalMessage = make(chan unsafe.Pointer, config.externalQueue)
+		ptr := mem.Alloc(uint(xxchan.Sizeof[unsafe.Pointer](int(config.externalQueue))))
+		task.externalMessage = xxchan.Make[unsafe.Pointer](ptr, int(config.externalQueue))
 	}
 
 	atomic.StoreInt64(&task.scheduleOwner, threadNone)
 	atomic.StoreInt64(&task.activeWorker, 0)
 	atomic.StoreInt64(&task.threadCount, 0)
 
-	event := make([]chan struct{}, maxSockEvent)
+	event := make([]*xxchan.Channel[struct{}], maxSockEvent)
 	eventInit := make([]atomicInt, maxSockEvent)
 	task.eventInit = eventInit
 	for i := range event {
-		ch := make(chan struct{})
+		ptr := mem.Alloc(uint(xxchan.Sizeof[struct{}](1)))
+		ch := xxchan.Make[struct{}](ptr, 1)
 		event[i] = ch
 		atomic.StoreInt64(&task.eventInit[i], 0)
 	}

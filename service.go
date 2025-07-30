@@ -5,7 +5,9 @@ import (
 	"unsafe"
 
 	"github.com/phuslu/log"
+	"github.com/smasher164/mem"
 	"go.yuchanns.xyz/lua"
+	"go.yuchanns.xyz/xxchan"
 )
 
 const (
@@ -35,7 +37,7 @@ type memoryStat struct {
 type service struct {
 	L             *lua.State
 	rL            *lua.State
-	msg           chan *message
+	msg           *xxchan.Channel[*message]
 	out           *message
 	bounce        *message
 	status        int64
@@ -63,7 +65,8 @@ func (s *service) init(ud *serviceUd, queueLen int64, pL *lua.State) (ok bool) {
 		L.Close()
 		return
 	}
-	s.msg = make(chan *message, queueLen)
+	ptr := mem.Alloc(uint(xxchan.Sizeof[*message](int(queueLen))))
+	s.msg = xxchan.Make[*message](ptr, int(queueLen))
 	s.L = L
 	s.rL = L.NewThread()
 	L.Ref(lua.LUA_REGISTRYINDEX)
@@ -121,9 +124,10 @@ func (s *service) close() {
 		s.L.Close()
 	}
 	if s.msg != nil {
-		close(s.msg)
-		for range s.msg {
+		for s.msg.Len() > 0 {
+			s.msg.Pop()
 		}
+		mem.Free(unsafe.Pointer(s.msg))
 		s.msg = nil
 	}
 	s.out = nil
@@ -160,10 +164,7 @@ func (task *ltask) checkMessageTo(to serviceId) {
 }
 
 func (task *ltask) scheduleBack(id serviceId) {
-	select {
-	case task.schedule <- int(id):
-		// Successfully sent to the schedule channel
-	default:
+	if !task.schedule.Push(int(id)) {
 		panic("schedule channel is full")
 	}
 }
@@ -200,11 +201,7 @@ func (p *servicePool) popMessage(id serviceId) (msg *message) {
 		s.bounce = nil
 		return
 	}
-	select {
-	case msg = <-s.msg:
-		return
-	default:
-	}
+	msg, _ = s.msg.Pop()
 	return
 }
 
@@ -217,7 +214,7 @@ func (p *servicePool) hasMessage(id serviceId) (has bool) {
 		has = true
 		return
 	}
-	return len(s.msg) > 0
+	return s.msg.Len() > 0
 }
 
 func (p *servicePool) pushMessage(msg *message) (block bool) {
@@ -225,12 +222,7 @@ func (p *servicePool) pushMessage(msg *message) (block bool) {
 	if s == nil || s.status == serviceStatusDead {
 		return
 	}
-	select {
-	case s.msg <- msg:
-		block = false
-	default:
-		block = true
-	}
+	block = !s.msg.Push(msg)
 	return
 }
 
@@ -257,11 +249,7 @@ func (p *servicePool) postMessage(msg *message) (ok bool) {
 	if s == nil || s.status == serviceStatusDead {
 		return
 	}
-	select {
-	case s.msg <- msg:
-		ok = true
-	default:
-	}
+	ok = s.msg.Push(msg)
 	return
 }
 

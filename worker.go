@@ -95,7 +95,11 @@ func (task *ltask) dispatchExternalMessages() {
 		task.externalLastMessage = nil
 		send = true
 	}
-	for msg := range task.externalMessage {
+	for {
+		msg, ok := task.externalMessage.Pop()
+		if !ok {
+			break
+		}
 		buf := serdePackString("external", msg)
 		msg, sz := mallocFromBuffer(buf)
 		m := &message{
