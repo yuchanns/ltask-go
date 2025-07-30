@@ -1,12 +1,12 @@
 package ltask
 
 import (
-	"fmt"
 	"runtime"
 	"sync"
 	"sync/atomic"
 	"unsafe"
 
+	"github.com/phuslu/log"
 	"go.yuchanns.xyz/lua"
 )
 
@@ -131,7 +131,7 @@ func lpostMessage(L *lua.State) int {
 	if !task.services.postMessage(&msg) {
 		return L.Errorf("push message failed")
 	}
-	// TODO: checkMessage
+	task.checkMessageTo(msg.to)
 	return 0
 }
 
@@ -230,15 +230,50 @@ func ltaskDeinit(L *lua.State) int {
 }
 
 func threadWorker(w *workerThread) {
-	// p := w.task.services
-	atomic.AddInt32(&w.task.activeWorker, 1)
-	fmt.Println("doing job in worker")
+	p := w.task.services
+	atomic.AddInt64(&w.task.activeWorker, 1)
+	log.Debug().Msgf("Worker %d start", w.workerId)
 
-	// for {
-	// 	if w.termSignal == 0 {
-	// 		break
-	// 	}
-	// }
+	for {
+		if w.termSignal > 0 {
+			break
+		}
+		id := w.getJob()
+		if id == 0 {
+			var noJob = true
+
+			for w.serviceDone == 1 {
+				if !w.acquireScheduler() {
+					continue
+				}
+				noJob = w.schedule()
+				w.releaseScheduler()
+			}
+
+			if noJob && w.task.blockedService == 0 {
+				atomic.AddInt64(&w.task.threadCount, -1)
+				log.Debug().Msgf("Worker %d sleeping", w.workerId)
+				w.sleep()
+				atomic.AddInt64(&w.task.activeWorker, 1)
+				log.Debug().Msgf("Worker %d wakeup", w.workerId)
+			}
+			continue
+		}
+
+		w.busy = 1
+		w.running = id
+		if w.waiting == id {
+			w.waiting = 0
+		}
+		status := p.getStatus(id)
+		if status == serviceStatusDead {
+			log.Debug().Msgf("Service %d is dead", id)
+		}
+		w.busy = 0
+	}
+	w.quit()
+	atomic.AddInt64(&w.task.threadCount, -1)
+	log.Debug().Msgf("Worker %d quit", w.workerId)
 }
 
 var bootInit atomic.Int32

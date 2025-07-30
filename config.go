@@ -7,7 +7,7 @@ import (
 	"go.yuchanns.xyz/lua"
 )
 
-type atomicInt = int32
+type atomicInt = int64
 
 const (
 	defaultMaxService   = 65536

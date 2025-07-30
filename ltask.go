@@ -57,7 +57,7 @@ type ltask struct {
 	schedule  chan int
 	timer     *timer
 	// TODO: logqueue?
-	externalMessage     chan any
+	externalMessage     chan unsafe.Pointer
 	externalLastMessage *message
 	scheduleOwner       atomicInt
 	activeWorker        atomicInt
@@ -82,12 +82,12 @@ func (task *ltask) init(L *lua.State, config *ltaskConfig) {
 	task.externalMessage = nil
 
 	if config.externalQueue > 0 {
-		task.externalMessage = make(chan any, config.externalQueue)
+		task.externalMessage = make(chan unsafe.Pointer, config.externalQueue)
 	}
 
-	atomic.StoreInt32(&task.scheduleOwner, threadNone)
-	atomic.StoreInt32(&task.activeWorker, 0)
-	atomic.StoreInt32(&task.threadCount, 0)
+	atomic.StoreInt64(&task.scheduleOwner, threadNone)
+	atomic.StoreInt64(&task.activeWorker, 0)
+	atomic.StoreInt64(&task.threadCount, 0)
 
 	event := make([]chan struct{}, maxSockEvent)
 	eventInit := make([]atomicInt, maxSockEvent)
@@ -95,7 +95,7 @@ func (task *ltask) init(L *lua.State, config *ltaskConfig) {
 	for i := range event {
 		ch := make(chan struct{})
 		event[i] = ch
-		atomic.StoreInt32(&task.eventInit[i], 0)
+		atomic.StoreInt64(&task.eventInit[i], 0)
 	}
 	task.event = event
 }
@@ -117,8 +117,8 @@ func (task *ltask) initWorker(L *lua.State) {
 		worker.running = 0
 		worker.binding = 0
 		worker.waiting = 0
-		atomic.StoreInt32(&worker.serviceReady, 0)
-		atomic.StoreInt32(&worker.serviceDone, 0)
+		atomic.StoreInt64(&worker.serviceReady, 0)
+		atomic.StoreInt64(&worker.serviceDone, 0)
 		worker.termSignal = 0
 		worker.sleeping = 0
 		worker.wakeup = 0

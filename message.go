@@ -20,3 +20,12 @@ const (
 	messageReceiptBlock    = 3
 	messageReceiptResponse = 4
 )
+
+const (
+	messageTypeSystem   = 0
+	messageTypeRequest  = 1
+	messageTypeResponse = 2
+	messageTypeError    = 3
+	messageTypeSignal   = 4
+	messageTypeIdle     = 5
+)

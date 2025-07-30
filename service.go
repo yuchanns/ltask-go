@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"unsafe"
 
+	"github.com/phuslu/log"
 	"go.yuchanns.xyz/lua"
 )
 
@@ -146,6 +147,111 @@ func newServicePool(config *ltaskConfig) (pool *servicePool) {
 	return
 }
 
+func (task *ltask) checkMessageTo(to serviceId) {
+	p := task.services
+	status := p.getStatus(to)
+	if status == serviceStatusIdle {
+		log.Debug().Msgf("Service %d is in schedule", to)
+		p.setStatus(to, serviceStatusSchedule)
+		task.scheduleBack(to)
+		return
+	}
+	// TODO: trigger sockevent of service
+}
+
+func (task *ltask) scheduleBack(id serviceId) {
+	select {
+	case task.schedule <- int(id):
+		// Successfully sent to the schedule channel
+	default:
+		panic("schedule channel is full")
+	}
+}
+
+func (p *servicePool) outMessage(id serviceId) (out *message) {
+	s := p.getService(id)
+	if s == nil {
+		return
+	}
+	out = s.out
+	s.out = nil
+
+	return
+}
+
+func (p *servicePool) writeReceipt(id serviceId, receipt int64, bounce *message) {
+	s := p.getService(id)
+	if s == nil || s.receipt != messageReceiptNone {
+		log.Error().Msgf("WARNING: write recipt %d fail (%d)", id, s.receipt)
+	}
+	if s != nil {
+		s.receipt = receipt
+		s.bounce = bounce
+	}
+}
+
+func (p *servicePool) popMessage(id serviceId) (msg *message) {
+	s := p.getService(id)
+	if s == nil {
+		return
+	}
+	if s.bounce != nil {
+		msg = s.bounce
+		s.bounce = nil
+		return
+	}
+	select {
+	case msg = <-s.msg:
+		return
+	default:
+	}
+	return
+}
+
+func (p *servicePool) hasMessage(id serviceId) (has bool) {
+	s := p.getService(id)
+	if s == nil {
+		return
+	}
+	if s.receipt != messageReceiptNone {
+		has = true
+		return
+	}
+	return len(s.msg) > 0
+}
+
+func (p *servicePool) pushMessage(msg *message) (block bool) {
+	s := p.getService(msg.to)
+	if s == nil || s.status == serviceStatusDead {
+		return
+	}
+	select {
+	case s.msg <- msg:
+		block = false
+	default:
+		block = true
+	}
+	return
+}
+
+func (p *servicePool) setStatus(id serviceId, status int64) {
+	s := p.getService(id)
+	if s == nil {
+		return
+	}
+	s.status = status
+}
+
+func (p *servicePool) getStatus(id serviceId) (status int64) {
+	s := p.getService(id)
+	if s == nil {
+		status = serviceStatusDead
+		return
+	}
+	status = s.status
+	return
+}
+
 func (p *servicePool) postMessage(msg *message) (ok bool) {
 	s := p.getService(msg.to)
 	if s == nil || s.status == serviceStatusDead {
@@ -189,6 +295,15 @@ func (p *servicePool) newService(sid int64) (svcId serviceId) {
 		clock:         0,
 	}
 	p.setService(s)
+	return
+}
+
+func (p *servicePool) getBindingThread(id serviceId) (thread int64) {
+	s := p.getService(id)
+	if s == nil {
+		return
+	}
+	thread = s.bindingThread
 	return
 }
 
