@@ -26,8 +26,6 @@ func getPtr[T any](L *lua.State, key string) *T {
 	return (*T)(v)
 }
 
-var task *ltask
-
 func ltaskInit(L *lua.State) int {
 	if L.GetTop() == 0 {
 		L.NewTable()
@@ -48,6 +46,7 @@ func ltaskInit(L *lua.State) int {
 		// TODO: set crash log
 	}
 
+	var task *ltask
 	task.init(L, config)
 
 	return 1
