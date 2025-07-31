@@ -5,6 +5,7 @@ import (
 	"sync/atomic"
 	"unsafe"
 
+	"github.com/phuslu/log"
 	"go.yuchanns.xyz/lua"
 	"go.yuchanns.xyz/xxchan"
 )
@@ -86,6 +87,16 @@ func (task *ltask) init(L *lua.State, config *ltaskConfig) {
 	if config.externalQueue > 0 {
 		ptr := malloc.Alloc(uint(xxchan.Sizeof[unsafe.Pointer](int(config.externalQueue))))
 		task.externalMessage = xxchan.Make[unsafe.Pointer](ptr, int(config.externalQueue))
+	}
+
+	typ, _ := L.GetField(1, "debuglog")
+	if typ == lua.LUA_TSTRING {
+		logFile := L.ToString(-1)
+		if logFile != "=" {
+			// TODO: use file logger
+		}
+	} else {
+		log.DefaultLogger.SetLevel(log.InfoLevel)
 	}
 
 	atomic.StoreInt64(&task.scheduleOwner, threadNone)
