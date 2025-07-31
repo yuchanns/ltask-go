@@ -239,9 +239,9 @@ func (w *workerThread) schedule() (noJob bool) {
 	return
 }
 
-func (w *workerThread) stealJob() (id serviceId) {
+func (w *workerThread) stealJob() (job serviceId) {
 	for i := range w.task.workers {
-		job := w.task.workers[i].stolen()
+		job = w.task.workers[i].stolen()
 		if job != 0 {
 			break
 		}
