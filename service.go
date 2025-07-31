@@ -314,8 +314,12 @@ func (p *servicePool) destroy() {
 		return
 	}
 	for i := range p.s {
-		p.s[i].close()
-		malloc.Free(unsafe.Pointer(p.s[i]))
+		s := p.s[i]
+		if s == nil {
+			continue
+		}
+		s.close()
+		malloc.Free(unsafe.Pointer(s))
 	}
 	malloc.Free(unsafe.Pointer(p))
 }
@@ -356,6 +360,7 @@ func (p *servicePool) deleteService(id serviceId) {
 	if s == nil {
 		return
 	}
+	malloc.Free(unsafe.Pointer(s))
 	p.setService(nil)
 	s.close()
 }
