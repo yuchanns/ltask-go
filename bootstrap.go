@@ -7,7 +7,6 @@ import (
 	"unsafe"
 
 	"github.com/phuslu/log"
-	"github.com/smasher164/mem"
 	"go.yuchanns.xyz/lua"
 )
 
@@ -113,12 +112,12 @@ func checkField(L *lua.State, index int, key string) int64 {
 func lpostMessage(L *lua.State) int {
 	typ, _ := L.GetField(1, "type")
 	L.CheckType(1, lua.LUA_TTABLE)
-	msg := message{
+	msg := newMessage(&message{
 		from:    checkField(L, 1, "from"),
 		to:      checkField(L, 1, "to"),
 		session: session(checkField(L, 1, "session")),
 		typ:     typ,
-	}
+	})
 	typ, _ = L.GetField(1, "message")
 	if typ != lua.LUA_TNIL {
 		if typ != lua.LUA_TLIGHTUSERDATA {
@@ -129,7 +128,8 @@ func lpostMessage(L *lua.State) int {
 		msg.sz = checkField(L, 1, "size")
 	}
 	task := getPtr[ltask](L, "LTASK_GLOBAL")
-	if !task.services.postMessage(&msg) {
+	if !task.services.postMessage(msg) {
+		msg.delete()
 		return L.Errorf("push message failed")
 	}
 	task.checkMessageTo(msg.to)
@@ -197,7 +197,7 @@ func ltaskWait(L *lua.State) int {
 		for ctx.task.event[i].Len() > 0 {
 			ctx.task.event[i].Pop()
 		}
-		mem.Free(unsafe.Pointer(ctx.task.event[i]))
+		malloc.Free(unsafe.Pointer(ctx.task.event[i]))
 		ctx.task.event[i] = nil
 	}
 
@@ -206,7 +206,7 @@ func ltaskWait(L *lua.State) int {
 		for ctx.task.externalMessage.Len() > 0 {
 			ctx.task.externalMessage.Pop()
 		}
-		mem.Free(unsafe.Pointer(ctx.task.externalMessage))
+		malloc.Free(unsafe.Pointer(ctx.task.externalMessage))
 		ctx.task.externalMessage = nil
 	}
 
@@ -224,7 +224,7 @@ func ltaskDeinit(L *lua.State) int {
 	for task.schedule.Len() > 0 {
 		task.schedule.Pop()
 	}
-	mem.Free(unsafe.Pointer(task.schedule))
+	malloc.Free(unsafe.Pointer(task.schedule))
 	task.schedule = nil
 	task.timer.destroy()
 

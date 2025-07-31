@@ -6,7 +6,6 @@ import (
 	"math"
 	"unsafe"
 
-	"github.com/smasher164/mem"
 	"go.yuchanns.xyz/lua"
 )
 
@@ -771,7 +770,7 @@ func serdeUnpackPtr(L *lua.State, buffer unsafe.Pointer) int {
 	length := binary.LittleEndian.Uint32(unsafe.Slice((*byte)(unsafe.Pointer(buffer)), 4))
 	data := unsafe.Slice((*byte)(unsafe.Add(buffer, 4)), int(length))
 
-	defer mem.Free(buffer)
+	defer malloc.Free(buffer)
 
 	L.PushGoFunction(func(L *lua.State) int {
 		return serdeUnpack(L, data)
@@ -793,7 +792,7 @@ func mallocFromBuffer(buf []byte) (ptr unsafe.Pointer, alignedSz int) {
 	sz := len(buf)
 
 	alignedSz = alignUp(sz, 8)
-	ptr = mem.Alloc(uint(alignedSz))
+	ptr = malloc.Alloc(uint(alignedSz))
 	buffer := unsafe.Slice((*byte)(unsafe.Pointer(ptr)), alignedSz)
 	copy(buffer, buf)
 	return
@@ -846,6 +845,6 @@ func LuaSerdeRemove(L *lua.State) int {
 	sz := L.CheckInteger(2)
 	_ = sz
 
-	mem.Free(data)
+	malloc.Free(data)
 	return 0
 }

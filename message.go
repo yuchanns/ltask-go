@@ -13,6 +13,20 @@ type message struct {
 	sz      int64
 }
 
+func newMessage(m *message) *message {
+	ptr := malloc.Alloc(uint(unsafe.Sizeof(*m)))
+	msg := (*message)(unsafe.Pointer(ptr))
+	*msg = *m
+	return msg
+}
+
+func (m *message) delete() {
+	if m == nil {
+		return
+	}
+	malloc.Free(unsafe.Pointer(m))
+}
+
 const (
 	messageReceiptNone     = 0
 	messageReceiptDone     = 1

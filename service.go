@@ -5,7 +5,6 @@ import (
 	"unsafe"
 
 	"github.com/phuslu/log"
-	"github.com/smasher164/mem"
 	"go.yuchanns.xyz/lua"
 	"go.yuchanns.xyz/xxchan"
 )
@@ -65,7 +64,7 @@ func (s *service) init(ud *serviceUd, queueLen int64, pL *lua.State) (ok bool) {
 		L.Close()
 		return
 	}
-	ptr := mem.Alloc(uint(xxchan.Sizeof[*message](int(queueLen))))
+	ptr := malloc.Alloc(uint(xxchan.Sizeof[*message](int(queueLen))))
 	s.msg = xxchan.Make[*message](ptr, int(queueLen))
 	s.L = L
 	s.rL = L.NewThread()
@@ -125,9 +124,12 @@ func (s *service) close() {
 	}
 	if s.msg != nil {
 		for s.msg.Len() > 0 {
-			s.msg.Pop()
+			msg, ok := s.msg.Pop()
+			if ok {
+				msg.delete()
+			}
 		}
-		mem.Free(unsafe.Pointer(s.msg))
+		malloc.Free(unsafe.Pointer(s.msg))
 		s.msg = nil
 	}
 	s.out = nil
@@ -142,12 +144,15 @@ type servicePool struct {
 }
 
 func newServicePool(config *ltaskConfig) (pool *servicePool) {
-	pool = &servicePool{
-		mask:     config.maxService - 1,
-		queueLen: config.queueSending,
-		id:       typeIdCount,
-		s:        make([]*service, config.maxService),
-	}
+	structSize := int(unsafe.Sizeof(servicePool{}))
+	elemSize := int(unsafe.Sizeof(&service{}))
+	elemAlign := int(unsafe.Alignof(&service{}))
+	ptr := malloc.Alloc(uint(alignUp(structSize+elemSize*int(config.maxService), elemAlign)))
+	pool = (*servicePool)(unsafe.Pointer(ptr))
+	pool.mask = config.maxService - 1
+	pool.id = 0
+	pool.queueLen = config.queueSending
+	pool.s = unsafe.Slice((**service)(unsafe.Pointer(uintptr(ptr)+uintptr(structSize))), int(config.maxService))
 	return
 }
 
@@ -274,14 +279,15 @@ func (p *servicePool) newService(sid int64) (svcId serviceId) {
 		p.id = id + 1
 	}
 	svcId = id
-	s := &service{
-		receipt:       messageReceiptNone,
-		id:            id,
-		status:        serviceStatusUninitialized,
-		bindingThread: -1,
-		cpucost:       0,
-		clock:         0,
-	}
+	var s *service
+	ptr := malloc.Alloc(uint(unsafe.Sizeof(*s)))
+	s = (*service)(unsafe.Pointer(ptr))
+	s.receipt = messageReceiptNone
+	s.id = svcId
+	s.status = serviceStatusUninitialized
+	s.bindingThread = -1
+	s.cpucost = 0
+	s.clock = 0
 	p.setService(s)
 	return
 }
@@ -309,9 +315,9 @@ func (p *servicePool) destroy() {
 	}
 	for i := range p.s {
 		p.s[i].close()
-		p.s[i] = nil
+		malloc.Free(unsafe.Pointer(p.s[i]))
 	}
-	p = nil
+	malloc.Free(unsafe.Pointer(p))
 }
 
 func initService(L *lua.State) int {

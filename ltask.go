@@ -5,7 +5,6 @@ import (
 	"sync/atomic"
 	"unsafe"
 
-	"github.com/smasher164/mem"
 	"go.yuchanns.xyz/lua"
 	"go.yuchanns.xyz/xxchan"
 )
@@ -77,7 +76,7 @@ func (task *ltask) init(L *lua.State, config *ltaskConfig) {
 	task.initWorker(L)
 
 	task.services = newServicePool(config)
-	ptr := mem.Alloc(uint(xxchan.Sizeof[int](int(config.maxService))))
+	ptr := malloc.Alloc(uint(xxchan.Sizeof[int](int(config.maxService))))
 	task.schedule = xxchan.Make[int](ptr, int(config.maxService))
 	// Windows compatiblity: initialize the timer with a nil value
 	// to clear any wired data in the memory.
@@ -85,7 +84,7 @@ func (task *ltask) init(L *lua.State, config *ltaskConfig) {
 	task.externalMessage = nil
 
 	if config.externalQueue > 0 {
-		ptr := mem.Alloc(uint(xxchan.Sizeof[unsafe.Pointer](int(config.externalQueue))))
+		ptr := malloc.Alloc(uint(xxchan.Sizeof[unsafe.Pointer](int(config.externalQueue))))
 		task.externalMessage = xxchan.Make[unsafe.Pointer](ptr, int(config.externalQueue))
 	}
 
@@ -97,7 +96,7 @@ func (task *ltask) init(L *lua.State, config *ltaskConfig) {
 	eventInit := make([]atomicInt, maxSockEvent)
 	task.eventInit = eventInit
 	for i := range event {
-		ptr := mem.Alloc(uint(xxchan.Sizeof[struct{}](1)))
+		ptr := malloc.Alloc(uint(xxchan.Sizeof[struct{}](1)))
 		ch := xxchan.Make[struct{}](ptr, 1)
 		event[i] = ch
 		atomic.StoreInt64(&task.eventInit[i], 0)
