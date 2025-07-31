@@ -360,9 +360,9 @@ func (p *servicePool) deleteService(id serviceId) {
 	if s == nil {
 		return
 	}
-	malloc.Free(unsafe.Pointer(s))
-	p.setService(nil)
 	s.close()
+	malloc.Free(unsafe.Pointer(s))
+	p.s[id&p.mask] = nil
 }
 
 func requireModule(L *lua.State) int {
@@ -381,23 +381,26 @@ func (task *ltask) initService(L *lua.State, id serviceId, label string,
 	s := task.services.getService(id)
 	if s == nil {
 		L.PushString(fmt.Sprintf("Service %d not found", id))
-		return false
+		return
 	}
+	defer func() {
+		if !ok {
+			task.services.deleteService(id)
+		}
+	}()
 	if !s.init(ud, task.services.queueLen, L) || !s.requiref("ltask", ltaskOpen, L) {
-		task.services.deleteService(id)
 		L.PushString(fmt.Sprintf("New service fail: %s", getErrorMessage(L)))
-		return false
+		return
 	}
 	s.setBinding(workerId)
 	if !s.setLabel(label) {
-		task.services.deleteService(id)
 		L.PushString(fmt.Sprintf("Set label fail: %s", getErrorMessage(L)))
-		return false
+		return
 	}
 	if err := s.loadString(source, chunkName); err != nil {
-		task.services.deleteService(id)
 		L.PushString(fmt.Sprintf("%s", err))
-		return false
+		return
 	}
-	return true
+	ok = true
+	return
 }
