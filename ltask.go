@@ -116,9 +116,11 @@ func (task *ltask) init(L *lua.State, config *ltaskConfig) {
 }
 
 func (task *ltask) initWorker(L *lua.State) {
+	workerSize := int(unsafe.Sizeof(workerThread{})) + xxchan.Sizeof[serviceId](bindingServiceQueue)
+
 	workers := unsafe.Slice(
 		(*workerThread)(L.NewUserDataUv(
-			int(unsafe.Sizeof(workerThread{}))*int(task.config.worker), 0,
+			workerSize*int(task.config.worker), 0,
 		)),
 		task.config.worker,
 	)
@@ -139,7 +141,11 @@ func (task *ltask) initWorker(L *lua.State) {
 		worker.wakeup = 0
 		worker.busy = 0
 
+		// FIXME: use malloc to allocate memory for the trigger
 		worker.trigger = &sync.Cond{L: &sync.Mutex{}}
+
+		ptr := unsafe.Pointer(uintptr(unsafe.Pointer(worker)) + unsafe.Sizeof(workerThread{}))
+		worker.bindingQueue = *xxchan.Make[serviceId](ptr, bindingServiceQueue)
 	}
 }
 

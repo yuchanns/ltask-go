@@ -5,17 +5,12 @@ import (
 	"sync/atomic"
 
 	"github.com/phuslu/log"
+	"go.yuchanns.xyz/xxchan"
 )
 
 const bindingServiceQueue = 16
 
 type serviceId = int64
-
-type bindingService struct {
-	head int64
-	tail int64
-	q    [bindingServiceQueue]serviceId
-}
 
 type workerThread struct {
 	task         *ltask
@@ -30,6 +25,8 @@ type workerThread struct {
 	wakeup       int64
 	busy         int64
 	trigger      *sync.Cond
+	bindingQueue xxchan.Channel[serviceId]
+	scheduleTime int64
 }
 
 func (w *workerThread) destroy() {
@@ -79,11 +76,23 @@ func (w *workerThread) dispatch() {
 	w.task.dispatchOutMessages(doneJobs)
 
 	// 3: get pending jobs
-	// jobs := w.task.getPendingJobs()
+	jobs := w.task.getPendingJobs()
 
 	// 4. assign queue task
+	freeSlots := w.task.countFreeSlots()
+
+	if freeSlots < len(jobs) {
+		panic("Not enough free slots to assign jobs")
+	}
 
 	// 5. assign task to workers
+	jobs = w.task.prepare(jobs, freeSlots-len(jobs))
+
+	// 6. assign prepared tasks
+	w.task.assignPrepare(jobs)
+
+	// 7
+	w.task.triggerBlockedWorkers()
 }
 
 func (task *ltask) dispatchExternalMessages() {
@@ -130,6 +139,119 @@ func (task *ltask) collectDoneJobs() (done []serviceId) {
 			done = append(done, job)
 		}
 	}
+	return
+}
+
+func (task *ltask) triggerBlockedWorkers() {
+	if task.blockedService == 0 {
+		return
+	}
+	var blocked int64
+	for i := range task.workers {
+		w := &task.workers[i]
+		if w.waiting == 0 {
+			continue
+		}
+		running := w.running
+		if running == 0 {
+			// continue waiting for blocked service running
+			blocked = 1
+			continue
+		}
+		// TODO: touch service who block the waiting service
+		w.waiting = 0
+	}
+
+	task.blockedService = blocked
+}
+
+func (task *ltask) assignPrepare(prepare []serviceId) {
+	var (
+		workerId   int
+		useBusy    bool
+		useBinding bool
+	)
+
+	for i := range prepare {
+		id := prepare[i]
+		for {
+			if workerId >= len(task.workers) {
+				if !useBusy {
+					useBusy = true
+					workerId = 0
+				} else {
+					useBinding = true
+					workerId = 0
+				}
+			}
+			w := &task.workers[workerId]
+			if !(useBusy || w.busy != 0) || !(w.binding == 0 || useBinding) {
+				continue
+			}
+			assign := w.assignJob(id)
+			if id == 0 {
+				continue
+			}
+			w.wake()
+			log.Debug().Msgf("Worker %d is assigned service %d", w.workerId, assign)
+			if assign == id {
+				// assign a none-binding service
+				break
+			}
+		}
+	}
+}
+
+func (task *ltask) prepare(prepare []serviceId, freeSlots int) []serviceId {
+	for i := 0; i < freeSlots; i++ {
+		job, ok := task.schedule.Pop()
+		if !ok {
+			// no more job
+			break
+		}
+		id := serviceId(job)
+		worker := task.services.getBindingThread(id)
+		if worker < 0 {
+			// no binding worker
+			prepare = append(prepare, id)
+			continue
+		}
+		w := &task.workers[worker]
+		if !w.bindingQueue.Push(id) {
+			// binding queue is full, we can't bind this service
+			task.schedule.Push(job)
+			continue
+		}
+		id = w.assignJob(id)
+		if id == 0 {
+			continue
+		}
+		w.kickRunning(id)
+		w.wake()
+		log.Debug().Msgf("Worker %d is assigned service %d", w.workerId, id)
+		freeSlots--
+	}
+	return prepare
+}
+
+func (task *ltask) countFreeSlots() (slots int) {
+	for i := range task.workers {
+		w := &task.workers[i]
+		if w.serviceReady != 0 {
+			continue
+		}
+		q := &w.bindingQueue
+		id, ok := q.Pop()
+		if !ok {
+			slots++
+			continue
+		}
+		atomic.StoreInt64(&w.serviceReady, id)
+		w.kickRunning(id)
+		w.wake()
+		log.Debug().Msgf("Worker %d is assigned service %d from binding queue", w.workerId, id)
+	}
+
 	return
 }
 
@@ -266,6 +388,19 @@ func (w *workerThread) stolen() (id serviceId) {
 	return
 }
 
+func (w *workerThread) assignJob(id serviceId) (ret serviceId) {
+	if w.serviceReady != 0 {
+		// There is already a job assigned, can't assign another one
+		return
+	}
+	if job, ok := w.bindingQueue.Pop(); ok {
+		id = job
+	}
+	w.serviceReady = id
+	ret = id
+	return
+}
+
 func (w *workerThread) sleep() {
 	if w.termSignal > 0 {
 		return
@@ -288,6 +423,22 @@ func (w *workerThread) sleep() {
 	w.sleeping = 1
 	w.trigger.Wait()
 	w.sleeping = 0
+}
+
+func (w *workerThread) kickRunning(id serviceId) {
+	w.task.blockedService = 1
+	w.waiting = id
+}
+
+func (w *workerThread) wake() {
+	w.trigger.L.Lock()
+	defer w.trigger.L.Unlock()
+
+	if w.sleeping == 0 {
+		return
+	}
+	w.wakeup = 1
+	w.trigger.Signal()
 }
 
 func (w *workerThread) hasJob() bool {
