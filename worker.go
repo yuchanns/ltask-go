@@ -1,11 +1,12 @@
 package ltask
 
 import (
-	"sync"
 	"sync/atomic"
+	"unsafe"
 
 	"github.com/phuslu/log"
 	"go.yuchanns.xyz/xxchan"
+	"go.yuchanns.xyz/xxcond"
 )
 
 const bindingServiceQueue = 16
@@ -24,13 +25,34 @@ type workerThread struct {
 	sleeping     int64
 	wakeup       int64
 	busy         int64
-	trigger      *sync.Cond
-	bindingQueue xxchan.Channel[serviceId]
+	trigger      *xxcond.Cond
+	bindingQueue *xxchan.Channel[serviceId]
 	scheduleTime int64
 }
 
+func (w *workerThread) init(task *ltask, id serviceId) {
+	w.task = task
+	w.workerId = id
+	w.running = 0
+	w.binding = 0
+	w.waiting = 0
+	atomic.StoreInt64(&w.serviceReady, 0)
+	atomic.StoreInt64(&w.serviceDone, 0)
+	w.termSignal = 0
+	w.sleeping = 0
+	w.wakeup = 0
+	w.busy = 0
+
+	ptr := malloc.Alloc(uint(xxcond.Sizeof()))
+	w.trigger = xxcond.Make(ptr)
+
+	ptr = malloc.Alloc(uint(xxchan.Sizeof[serviceId](bindingServiceQueue)))
+	w.bindingQueue = xxchan.Make[serviceId](ptr, bindingServiceQueue)
+}
+
 func (w *workerThread) destroy() {
-	w.trigger = nil
+	malloc.Free(unsafe.Pointer(w.trigger))
+	malloc.Free(unsafe.Pointer(w.bindingQueue))
 }
 
 // getJob retrieves a job from the worker's serviceReady queue.
@@ -252,7 +274,7 @@ func (task *ltask) countFreeSlots() (slots int) {
 		if w.serviceReady != 0 {
 			continue
 		}
-		q := &w.bindingQueue
+		q := w.bindingQueue
 		id, ok := q.Pop()
 		if !ok {
 			slots++
@@ -426,8 +448,8 @@ func (w *workerThread) sleep() {
 		return
 	}
 
-	w.trigger.L.Lock()
-	defer w.trigger.L.Unlock()
+	w.trigger.Lock()
+	defer w.trigger.Unlock()
 
 	if w.hasJob() {
 		w.wakeup = 0
@@ -448,9 +470,6 @@ func (w *workerThread) kickRunning(id serviceId) {
 }
 
 func (w *workerThread) wake() {
-	w.trigger.L.Lock()
-	defer w.trigger.L.Unlock()
-
 	if w.sleeping == 0 {
 		return
 	}
@@ -463,9 +482,6 @@ func (w *workerThread) hasJob() bool {
 }
 
 func (w *workerThread) quit() {
-	w.trigger.L.Lock()
-	defer w.trigger.L.Unlock()
-
 	w.trigger.Signal()
 
 	w.sleeping = 0

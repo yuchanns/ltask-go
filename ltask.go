@@ -1,7 +1,6 @@
 package ltask
 
 import (
-	"sync"
 	"sync/atomic"
 	"unsafe"
 
@@ -116,7 +115,7 @@ func (task *ltask) init(L *lua.State, config *ltaskConfig) {
 }
 
 func (task *ltask) initWorker(L *lua.State) {
-	workerSize := int(unsafe.Sizeof(workerThread{})) + xxchan.Sizeof[serviceId](bindingServiceQueue)
+	workerSize := int(unsafe.Sizeof(workerThread{}))
 
 	workers := unsafe.Slice(
 		(*workerThread)(L.NewUserDataUv(
@@ -128,24 +127,7 @@ func (task *ltask) initWorker(L *lua.State) {
 	L.SetField(lua.LUA_REGISTRYINDEX, "LTASK_WORKERS")
 
 	for id := range task.config.worker {
-		worker := &task.workers[id]
-		worker.task = task
-		worker.workerId = id
-		worker.running = 0
-		worker.binding = 0
-		worker.waiting = 0
-		atomic.StoreInt64(&worker.serviceReady, 0)
-		atomic.StoreInt64(&worker.serviceDone, 0)
-		worker.termSignal = 0
-		worker.sleeping = 0
-		worker.wakeup = 0
-		worker.busy = 0
-
-		// FIXME: use malloc to allocate memory for the trigger
-		worker.trigger = &sync.Cond{L: &sync.Mutex{}}
-
-		ptr := unsafe.Pointer(uintptr(unsafe.Pointer(worker)) + unsafe.Sizeof(workerThread{}))
-		worker.bindingQueue = *xxchan.Make[serviceId](ptr, bindingServiceQueue)
+		task.workers[id].init(task, id)
 	}
 }
 

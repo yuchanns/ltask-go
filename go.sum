@@ -16,6 +16,8 @@ go.yuchanns.xyz/lua v0.0.0-20250727075619-463d1051632b h1:ajC1JBFxyfTEtebnIUU+Oj
 go.yuchanns.xyz/lua v0.0.0-20250727075619-463d1051632b/go.mod h1:+R8nITRHih7Fm5mzxDMq4TgtGLGUkCgY9WWcYunSvHM=
 go.yuchanns.xyz/xxchan v0.1.0 h1:0ZjPsmoYPqWHPm5siMMjLai9XYv8kUt06l0WCBYR5BA=
 go.yuchanns.xyz/xxchan v0.1.0/go.mod h1:GnRPr1zN3Me0NDQNv734GzC9c48AVkWTFPpZHsGd8eU=
+go.yuchanns.xyz/xxcond v0.1.0 h1:/Ho8r0cbz/4o3F9JPFUgmGQ1HxArbPReCOUmnqzlOW4=
+go.yuchanns.xyz/xxcond v0.1.0/go.mod h1:0DEH15X7Yo9WZwEHQnroC7WdnWb+Rbf9PWnADr2rmZM=
 golang.org/x/sys v0.0.0-20191113165036-4c7a9d0fe056/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.33.0 h1:q3i8TbbEz+JRD9ywIRlyRAQbM0qF7hu24q3teo2hbuw=
 golang.org/x/sys v0.33.0/go.mod h1:BJP2sWEmIv4KK5OTEluFJCKSidICx8ciO85XgH3Ak8k=
