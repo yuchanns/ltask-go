@@ -470,3 +470,102 @@ func (w *workerThread) quit() {
 
 	w.sleeping = 0
 }
+
+func (w *workerThread) start() {
+	p := w.task.services
+	atomic.AddInt64(&w.task.activeWorker, 1)
+	log.Debug().Msgf("Worker %d start", w.workerId)
+
+	for {
+		if w.termSignal > 0 {
+			break
+		}
+		id := w.getJob()
+		var dead bool
+		if id == 0 {
+			// No job, try to acquire scheduler to find a job
+			var noJob = true
+
+			for {
+				if !w.acquireScheduler() {
+					continue
+				}
+				noJob = w.schedule()
+				w.releaseScheduler()
+
+				if w.serviceDone == 0 {
+					break
+				}
+			}
+
+			if noJob && w.task.blockedService == 0 {
+				// go to sleep if no job and no blocked service
+				atomic.AddInt64(&w.task.threadCount, -1)
+				log.Debug().Msgf("Worker %d sleeping", w.workerId)
+				w.sleep()
+				atomic.AddInt64(&w.task.activeWorker, 1)
+				log.Debug().Msgf("Worker %d wakeup", w.workerId)
+			}
+			continue
+		}
+		// Get a job to do
+		w.busy = 1
+		w.running = id
+		if w.waiting == id {
+			w.waiting = 0
+		}
+		status := p.getStatus(id)
+		if status == serviceStatusDead {
+			log.Debug().Msgf("Service %d is dead", id)
+		} else {
+			log.Debug().Msgf("Service %d is running on worker %d", id, w.workerId)
+			if status != serviceStatusSchedule {
+				panic("Service is not in schedule status")
+			}
+			p.setStatus(id, serviceStatusRunning)
+			if !p.resume(id) {
+				dead = true
+				log.Debug().Msgf("Service %d quit", id)
+				p.setStatus(id, serviceStatusDead)
+				if id == serviceIdRoot {
+					// root quit, wakeup others
+					w.task.quitAllWorkers()
+					w.task.wakeupAlWorkers()
+					break
+				}
+				//
+			} else {
+				p.setStatus(id, serviceStatusDone)
+			}
+		}
+		w.busy = 0
+
+		// check binding
+		if dead && w.binding == id {
+			w.binding = 0
+		} else if !dead && p.getBindingThread(id) == w.workerId {
+			w.binding = id
+		}
+
+		for !w.completeJob() {
+			// Unable to complete job (running -> done)
+			// Try to acquire scheduler and then complete again
+			if !w.acquireScheduler() {
+				continue
+			}
+			if !w.completeJob() {
+				// Still unable to complete job, try to dispatch
+				w.dispatch()
+				for !w.completeJob() {
+				}
+			}
+			w.schedule()
+			w.releaseScheduler()
+			break
+		}
+	}
+	w.quit()
+	atomic.AddInt64(&w.task.threadCount, -1)
+	log.Debug().Msgf("Worker %d quit", w.workerId)
+
+}
