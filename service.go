@@ -2,6 +2,7 @@ package ltask
 
 import (
 	"fmt"
+	"time"
 	"unsafe"
 
 	"github.com/phuslu/log"
@@ -228,6 +229,35 @@ func (p *servicePool) pushMessage(msg *message) (block bool) {
 		return
 	}
 	block = !s.msg.Push(msg)
+	return
+}
+
+func (p *servicePool) resume(id serviceId) (yield bool) {
+	s := p.getService(id)
+	if s == nil {
+		return
+	}
+	L := s.L
+	if L == nil {
+		return
+	}
+	start := time.Now()
+	nres, yield, err := L.Resume(nil, 0)
+	s.cpucost = uint64(time.Since(start).Nanoseconds())
+	if err == nil {
+		if yield {
+			L.Pop(int(nres))
+		}
+		return
+	}
+	if !L.CheckStack(lua.LUA_MINSTACK) {
+		log.Error().Msgf("%s", err)
+		return
+	}
+	L.PushString(fmt.Sprintf("Service %d error: %s", id, err))
+	L.Traceback(L, err.Error(), 0)
+	log.Error().Msgf("%s", err)
+	L.Pop(2)
 	return
 }
 

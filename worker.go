@@ -95,6 +95,18 @@ func (w *workerThread) dispatch() {
 	w.task.triggerBlockedWorkers()
 }
 
+func (task *ltask) wakeupAlWorkers() {
+	for i := range task.workers {
+		task.workers[i].wake()
+	}
+}
+
+func (task *ltask) quitAllWorkers() {
+	for i := range task.workers {
+		task.workers[i].termSignal = 1
+	}
+}
+
 func (task *ltask) dispatchExternalMessages() {
 	var send bool
 	if task.externalLastMessage != nil {
@@ -185,7 +197,7 @@ func (task *ltask) assignPrepare(prepare []serviceId) {
 				}
 			}
 			w := &task.workers[workerId]
-			if !(useBusy || w.busy != 0) || !(w.binding == 0 || useBinding) {
+			if !(useBusy || w.busy == 0) || !(w.binding == 0 || useBinding) {
 				continue
 			}
 			assign := w.assignJob(id)
@@ -203,7 +215,7 @@ func (task *ltask) assignPrepare(prepare []serviceId) {
 }
 
 func (task *ltask) prepare(prepare []serviceId, freeSlots int) []serviceId {
-	for i := 0; i < freeSlots; i++ {
+	for range freeSlots {
 		job, ok := task.schedule.Pop()
 		if !ok {
 			// no more job
@@ -339,6 +351,14 @@ func (w *workerThread) doneJob() (job serviceId) {
 	return
 }
 
+func (w *workerThread) completeJob() (ok bool) {
+	if atomic.CompareAndSwapInt64(&w.serviceDone, 0, w.running) {
+		w.running = 0
+		ok = true
+	}
+	return
+}
+
 func (w *workerThread) schedule() (noJob bool) {
 	w.dispatch()
 	if w.hasJob() {
@@ -405,9 +425,6 @@ func (w *workerThread) sleep() {
 	if w.termSignal > 0 {
 		return
 	}
-	// FIXME: currently we set to term once sleep
-	w.termSignal = 1
-	return
 
 	w.trigger.L.Lock()
 	defer w.trigger.L.Unlock()
