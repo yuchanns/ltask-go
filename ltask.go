@@ -1,11 +1,12 @@
 package ltask
 
 import (
-	"sync"
 	"sync/atomic"
 	"unsafe"
 
+	"github.com/phuslu/log"
 	"go.yuchanns.xyz/lua"
+	"go.yuchanns.xyz/xxchan"
 )
 
 var luaLib *lua.Lib
@@ -52,12 +53,12 @@ type ltask struct {
 	config    *ltaskConfig
 	workers   []workerThread
 	eventInit []atomicInt
-	event     []chan struct{}
+	event     []*xxchan.Channel[struct{}]
 	services  *servicePool
-	schedule  chan int
+	schedule  *xxchan.Channel[int]
 	timer     *timer
 	// TODO: logqueue?
-	externalMessage     chan any
+	externalMessage     *xxchan.Channel[unsafe.Pointer]
 	externalLastMessage *message
 	scheduleOwner       atomicInt
 	activeWorker        atomicInt
@@ -75,35 +76,50 @@ func (task *ltask) init(L *lua.State, config *ltaskConfig) {
 	task.initWorker(L)
 
 	task.services = newServicePool(config)
-	task.schedule = make(chan int, config.maxService)
+	ptr := malloc.Alloc(uint(xxchan.Sizeof[int](int(config.maxService))))
+	task.schedule = xxchan.Make[int](ptr, int(config.maxService))
 	// Windows compatiblity: initialize the timer with a nil value
 	// to clear any wired data in the memory.
 	task.timer = nil
 	task.externalMessage = nil
 
 	if config.externalQueue > 0 {
-		task.externalMessage = make(chan any, config.externalQueue)
+		ptr := malloc.Alloc(uint(xxchan.Sizeof[unsafe.Pointer](int(config.externalQueue))))
+		task.externalMessage = xxchan.Make[unsafe.Pointer](ptr, int(config.externalQueue))
 	}
 
-	atomic.StoreInt32(&task.scheduleOwner, threadNone)
-	atomic.StoreInt32(&task.activeWorker, 0)
-	atomic.StoreInt32(&task.threadCount, 0)
+	typ, _ := L.GetField(1, "debuglog")
+	if typ == lua.LUA_TSTRING {
+		logFile := L.ToString(-1)
+		if logFile != "=" {
+			// TODO: use file logger
+		}
+	} else {
+		log.DefaultLogger.SetLevel(log.InfoLevel)
+	}
 
-	event := make([]chan struct{}, maxSockEvent)
+	atomic.StoreInt64(&task.scheduleOwner, threadNone)
+	atomic.StoreInt64(&task.activeWorker, 0)
+	atomic.StoreInt64(&task.threadCount, 0)
+
+	event := make([]*xxchan.Channel[struct{}], maxSockEvent)
 	eventInit := make([]atomicInt, maxSockEvent)
 	task.eventInit = eventInit
 	for i := range event {
-		ch := make(chan struct{})
+		ptr := malloc.Alloc(uint(xxchan.Sizeof[struct{}](1)))
+		ch := xxchan.Make[struct{}](ptr, 1)
 		event[i] = ch
-		atomic.StoreInt32(&task.eventInit[i], 0)
+		atomic.StoreInt64(&task.eventInit[i], 0)
 	}
 	task.event = event
 }
 
 func (task *ltask) initWorker(L *lua.State) {
+	workerSize := int(unsafe.Sizeof(workerThread{}))
+
 	workers := unsafe.Slice(
 		(*workerThread)(L.NewUserDataUv(
-			int(unsafe.Sizeof(workerThread{}))*int(task.config.worker), 0,
+			workerSize*int(task.config.worker), 0,
 		)),
 		task.config.worker,
 	)
@@ -111,20 +127,7 @@ func (task *ltask) initWorker(L *lua.State) {
 	L.SetField(lua.LUA_REGISTRYINDEX, "LTASK_WORKERS")
 
 	for id := range task.config.worker {
-		worker := &task.workers[id]
-		worker.task = task
-		worker.workerId = id
-		worker.running = 0
-		worker.binding = 0
-		worker.waiting = 0
-		atomic.StoreInt32(&worker.serviceReady, 0)
-		atomic.StoreInt32(&worker.serviceDone, 0)
-		worker.termSignal = 0
-		worker.sleeping = 0
-		worker.wakeup = 0
-		worker.busy = 0
-
-		worker.trigger = &sync.Cond{L: &sync.Mutex{}}
+		task.workers[id].init(task, id)
 	}
 }
 

@@ -1,6 +1,9 @@
 package ltask
 
-import "time"
+import (
+	"time"
+	"unsafe"
+)
 
 type timer struct {
 	starttime    int64
@@ -8,8 +11,9 @@ type timer struct {
 	currentPoint int64
 }
 
-func newTimer() *timer {
-	t := &timer{}
+func newTimer() (t *timer) {
+	ptr := malloc.Alloc(uint(unsafe.Sizeof(*t)))
+	t = (*timer)(ptr)
 	t.init()
 
 	now := time.Now().UnixNano()
@@ -25,5 +29,9 @@ func (t *timer) init() {
 }
 
 func (t *timer) destroy() {
+	if t == nil {
+		return
+	}
 	// TODO: Cleanup timer resources
+	malloc.Free(unsafe.Pointer(t))
 }

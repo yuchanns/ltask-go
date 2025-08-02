@@ -6,7 +6,6 @@ import (
 	"math"
 	"unsafe"
 
-	"github.com/smasher164/mem"
 	"go.yuchanns.xyz/lua"
 )
 
@@ -426,6 +425,14 @@ func (wb *writeBlock) packOne(L *lua.State, index int) {
 	}
 }
 
+func (wb *writeBlock) Bytes() []byte {
+	data := wb.buf.Bytes()
+	result := make([]byte, 4+len(data))
+	binary.LittleEndian.PutUint32(result[:4], uint32(len(data)))
+	copy(result[4:], data)
+	return result
+}
+
 func (wb *writeBlock) packFrom(L *lua.State, from int) {
 	top := L.GetTop()
 	n := top - from
@@ -719,6 +726,15 @@ func (rb *readBlock) unpackOne(L *lua.State) {
 	rb.pushValue(L, typ&0x7, typ>>3)
 }
 
+func serdePackString(content string, p unsafe.Pointer) []byte {
+	wb := newWriteBlock()
+	wb.writeString(content)
+	if p != nil {
+		wb.writePointer(p, serdeTypeUserDataPointer)
+	}
+	return wb.Bytes()
+}
+
 func serdeUnpack(L *lua.State, buffer []byte) int {
 	top := L.GetTop()
 
@@ -745,12 +761,7 @@ func serdePack(L *lua.State, from int) []byte {
 	wb := newWriteBlock()
 	wb.packFrom(L, from)
 
-	data := wb.buf.Bytes()
-	result := make([]byte, 4+len(data))
-	binary.LittleEndian.PutUint32(result[:4], uint32(len(data)))
-	copy(result[4:], data)
-
-	return result
+	return wb.Bytes()
 }
 
 func serdeUnpackPtr(L *lua.State, buffer unsafe.Pointer) int {
@@ -759,7 +770,7 @@ func serdeUnpackPtr(L *lua.State, buffer unsafe.Pointer) int {
 	length := binary.LittleEndian.Uint32(unsafe.Slice((*byte)(unsafe.Pointer(buffer)), 4))
 	data := unsafe.Slice((*byte)(unsafe.Add(buffer, 4)), int(length))
 
-	defer mem.Free(buffer)
+	defer malloc.Free(buffer)
 
 	L.PushGoFunction(func(L *lua.State) int {
 		return serdeUnpack(L, data)
@@ -777,14 +788,19 @@ func alignUp(n, align int) int {
 	return (n + align - 1) &^ (align - 1)
 }
 
-func LuaSerdePack(L *lua.State) int {
-	buf := serdePack(L, 0)
+func mallocFromBuffer(buf []byte) (ptr unsafe.Pointer, alignedSz int) {
 	sz := len(buf)
 
-	alignedSz := alignUp(sz, 8)
-	ptr := mem.Alloc(uint(alignedSz))
+	alignedSz = alignUp(sz, 8)
+	ptr = malloc.Alloc(uint(alignedSz))
 	buffer := unsafe.Slice((*byte)(unsafe.Pointer(ptr)), alignedSz)
 	copy(buffer, buf)
+	return
+}
+
+func LuaSerdePack(L *lua.State) int {
+	buf := serdePack(L, 0)
+	ptr, alignedSz := mallocFromBuffer(buf)
 
 	L.PushLightUserData(ptr)
 	L.PushInteger(int64(alignedSz))
@@ -829,6 +845,6 @@ func LuaSerdeRemove(L *lua.State) int {
 	sz := L.CheckInteger(2)
 	_ = sz
 
-	mem.Free(data)
+	malloc.Free(data)
 	return 0
 }

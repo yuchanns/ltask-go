@@ -1,7 +1,7 @@
 package ltask
 
 import (
-	"fmt"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"unsafe"
@@ -25,8 +25,6 @@ func getPtr[T any](L *lua.State, key string) *T {
 	return (*T)(v)
 }
 
-var task *ltask
-
 func ltaskInit(L *lua.State) int {
 	if L.GetTop() == 0 {
 		L.NewTable()
@@ -47,6 +45,7 @@ func ltaskInit(L *lua.State) int {
 		// TODO: set crash log
 	}
 
+	var task *ltask
 	task.init(L, config)
 
 	return 1
@@ -111,12 +110,12 @@ func checkField(L *lua.State, index int, key string) int64 {
 func lpostMessage(L *lua.State) int {
 	typ, _ := L.GetField(1, "type")
 	L.CheckType(1, lua.LUA_TTABLE)
-	msg := message{
+	msg := newMessage(&message{
 		from:    checkField(L, 1, "from"),
 		to:      checkField(L, 1, "to"),
 		session: session(checkField(L, 1, "session")),
 		typ:     typ,
-	}
+	})
 	typ, _ = L.GetField(1, "message")
 	if typ != lua.LUA_TNIL {
 		if typ != lua.LUA_TLIGHTUSERDATA {
@@ -127,10 +126,11 @@ func lpostMessage(L *lua.State) int {
 		msg.sz = checkField(L, 1, "size")
 	}
 	task := getPtr[ltask](L, "LTASK_GLOBAL")
-	if !task.services.postMessage(&msg) {
+	if !task.services.postMessage(msg) {
+		msg.delete()
 		return L.Errorf("push message failed")
 	}
-	// TODO: checkMessage
+	task.checkMessageTo(msg.to)
 	return 0
 }
 
@@ -172,12 +172,15 @@ func ltaskRun(L *lua.State) int {
 		go func(w *workerThread) {
 			defer wg.Done()
 
-			threadWorker(w)
+			w.start()
 		}(&task.workers[i])
 	}
 
 	if useMainThread && mainThread != nil {
-		threadWorker(mainThread)
+		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
+
+		mainThread.start()
 	}
 
 	return 1
@@ -189,17 +192,19 @@ func ltaskWait(L *lua.State) int {
 	ctx.wg.Wait()
 
 	for i := range ctx.task.event {
-		close(ctx.task.event[i])
-		for range ctx.task.event[i] {
+		for ctx.task.event[i].Len() > 0 {
+			ctx.task.event[i].Pop()
 		}
+		malloc.Free(unsafe.Pointer(ctx.task.event[i]))
 		ctx.task.event[i] = nil
 	}
 
 	ctx.task.externalLastMessage = nil
 	if ctx.task.externalMessage != nil {
-		close(ctx.task.externalMessage)
-		for range ctx.task.externalMessage {
+		for ctx.task.externalMessage.Len() > 0 {
+			ctx.task.externalMessage.Pop()
 		}
+		malloc.Free(unsafe.Pointer(ctx.task.externalMessage))
 		ctx.task.externalMessage = nil
 	}
 
@@ -214,27 +219,16 @@ func ltaskDeinit(L *lua.State) int {
 		w.destroy()
 	}
 	task.services.destroy()
-	close(task.schedule)
-	for range task.schedule {
+	for task.schedule.Len() > 0 {
+		task.schedule.Pop()
 	}
+	malloc.Free(unsafe.Pointer(task.schedule))
 	task.schedule = nil
 	task.timer.destroy()
 
 	L.PushNil()
 	L.SetField(lua.LUA_REGISTRYINDEX, "LTASK_GLOBAL")
 	return 0
-}
-
-func threadWorker(w *workerThread) {
-	// p := w.task.services
-	atomic.AddInt32(&w.task.activeWorker, 1)
-	fmt.Println("doing job in worker")
-
-	// for {
-	// 	if w.termSignal == 0 {
-	// 		break
-	// 	}
-	// }
 }
 
 var bootInit atomic.Int32
