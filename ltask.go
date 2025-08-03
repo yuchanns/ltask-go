@@ -15,10 +15,10 @@ func OpenLibs(L *lua.State, lib *lua.Lib) {
 	_ = L.GetGlobal("package")
 	_, _ = L.GetField(-1, "preload")
 
-	l := []luaLReg{
+	l := []*lua.Reg{
 		{"ltask.bootstrap", ltaskBootstrapOpen},
 	}
-	luaLSetFuncs(L, l)
+	L.SetFuncs(l, 0)
 	L.Pop(2)
 
 	luaLib = lib
@@ -35,24 +35,6 @@ func ltaskOpen(L *lua.State) int {
 
 	L.NewLib(l)
 	return 1
-}
-
-type luaLReg struct {
-	name string
-	fn   lua.GoFunc
-}
-
-func luaLNewLib(L *lua.State, l []luaLReg) {
-	L.NewTable()
-
-	luaLSetFuncs(L, l)
-}
-
-func luaLSetFuncs(L *lua.State, l []luaLReg) {
-	for _, i := range l {
-		L.PushGoFunction(i.fn)
-		L.SetField(-2, i.name)
-	}
 }
 
 type ltask struct {

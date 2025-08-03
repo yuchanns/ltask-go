@@ -12,8 +12,8 @@ func ltaskRootOpen(L *lua.State) int {
 	if rootInit.Add(1) != 1 {
 		return L.Errorf("ltask.root can only require once")
 	}
-	l := []luaLReg{}
+	l := []*lua.Reg{}
 
-	luaLNewLib(L, l)
+	L.NewLib(l)
 	return 1
 }

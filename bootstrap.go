@@ -237,7 +237,7 @@ func ltaskBootstrapOpen(L *lua.State) int {
 	if bootInit.Add(1) != 1 {
 		return L.Errorf("ltask.bootstrap can only require once")
 	}
-	l := []luaLReg{
+	l := []*lua.Reg{
 		{"init", ltaskInit},
 		{"deinit", ltaskDeinit},
 		{"run", ltaskRun},
@@ -253,6 +253,6 @@ func ltaskBootstrapOpen(L *lua.State) int {
 		{"unpack_remove", LuaSerdeUnpackRemove},
 	}
 
-	luaLNewLib(L, l)
+	L.NewLib(l)
 	return 1
 }
