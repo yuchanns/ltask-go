@@ -1,11 +1,13 @@
 package ltask
 
 import (
+	"bytes"
 	"fmt"
 	"time"
 	"unsafe"
 
 	"github.com/phuslu/log"
+	"github.com/smasher164/mem"
 	"go.yuchanns.xyz/lua"
 	"go.yuchanns.xyz/xxchan"
 )
@@ -186,6 +188,18 @@ func (p *servicePool) outMessage(id serviceId) (out *message) {
 	return
 }
 
+func (p *servicePool) getLabel(id serviceId) string {
+	s := p.getService(id)
+	if s == nil {
+		return "<dead service>"
+	}
+	n := bytes.IndexByte(s.label[:], 0)
+	if n == -1 {
+		n = len(s.label)
+	}
+	return string(s.label[:n])
+}
+
 func (p *servicePool) writeReceipt(id serviceId, receipt int64, bounce *message) {
 	s := p.getService(id)
 	if s == nil || s.receipt != messageReceiptNone {
@@ -355,9 +369,10 @@ func (p *servicePool) destroy() {
 }
 
 func initService(L *lua.State) int {
-	// ud := (*byte)(L.ToUserData(1))
-	// size := L.ToInteger(2)
-	// initServiceKey
+	// TODO: set ud as a string
+	ud := L.ToUserData(1)
+	L.PushLightUserData(ud)
+	L.SetField(lua.LUA_REGISTRYINDEX, "LTASK_ID")
 	L.OpenLibs()
 	return 0
 }
@@ -404,10 +419,11 @@ func requireModule(L *lua.State) int {
 
 func (task *ltask) initService(L *lua.State, id serviceId, label string,
 	source string, chunkName string, workerId int64) (ok bool) {
-	ud := &serviceUd{
-		task: task,
-		id:   id,
-	}
+	// FIXME: free memory of ud when service is delete
+	ptr := mem.Alloc(uint(unsafe.Sizeof(serviceUd{})))
+	ud := (*serviceUd)(unsafe.Pointer(ptr))
+	ud.task = task
+	ud.id = id
 	s := task.services.getService(id)
 	if s == nil {
 		L.PushString(fmt.Sprintf("Service %d not found", id))

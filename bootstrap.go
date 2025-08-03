@@ -107,16 +107,34 @@ func checkField(L *lua.State, index int, key string) int64 {
 	return v
 }
 
+func lrecvMessage(L *lua.State) (r int) {
+	s := getS(L)
+	m := s.task.services.popMessage(s.id)
+	if m == nil {
+		return
+	}
+	r = 3
+	L.PushInteger(m.from)
+	L.PushInteger((int64(m.session)))
+	L.PushInteger(int64(m.typ))
+	if m.msg != nil {
+		L.PushLightUserData(m.msg)
+		L.PushInteger(m.sz)
+		r += 2
+	}
+	m.delete()
+	return
+}
+
 func lpostMessage(L *lua.State) int {
-	typ, _ := L.GetField(1, "type")
 	L.CheckType(1, lua.LUA_TTABLE)
 	msg := newMessage(&message{
 		from:    checkField(L, 1, "from"),
 		to:      checkField(L, 1, "to"),
 		session: session(checkField(L, 1, "session")),
-		typ:     typ,
+		typ:     int(checkField(L, 1, "type")),
 	})
-	typ, _ = L.GetField(1, "message")
+	typ, _ := L.GetField(1, "message")
 	if typ != lua.LUA_TNIL {
 		if typ != lua.LUA_TLIGHTUSERDATA {
 			return L.Errorf(".message should be a pointer")

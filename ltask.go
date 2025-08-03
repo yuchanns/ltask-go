@@ -34,7 +34,57 @@ func ltaskOpen(L *lua.State) int {
 	}
 
 	L.NewLib(l)
+
+	l2 := []*lua.Reg{
+		{"recv_message", lrecvMessage},
+		{"self", lself},
+		{"label", ltaskLabel},
+		{"pushlog", ltaskPushLog},
+	}
+
+	typ, _ := L.GetField(lua.LUA_REGISTRYINDEX, "LTASK_ID")
+	if typ != lua.LUA_TLIGHTUSERDATA {
+		L.Errorf("No service id, the VM is not inited by ltask")
+	}
+	ud := L.ToUserData(-1)
+	L.Pop(1)
+
+	L.PushLightUserData(ud)
+	L.SetFuncs(l2, 1)
+
 	return 1
+}
+
+func getS(L *lua.State) *serviceUd {
+	ud := L.ToUserData(L.UpValueIndex(1))
+	if ud == nil {
+		panic("Invalid service userdata")
+	}
+	return (*serviceUd)(ud)
+}
+
+func lself(L *lua.State) int {
+	s := getS(L)
+	L.PushInteger(s.id)
+	return 1
+}
+
+func ltaskLabel(L *lua.State) int {
+	s := getS(L)
+	label := s.task.services.getLabel(s.id)
+	L.PushString(label)
+	return 1
+}
+
+func ltaskPushLog(L *lua.State) int {
+	L.CheckType(1, lua.LUA_TLIGHTUSERDATA)
+	// data := L.ToUserData(1)
+	// sz := L.CheckInteger(2)
+	// s := getS(L)
+	// TODO: logqueue
+	//
+
+	return 0
 }
 
 type ltask struct {
