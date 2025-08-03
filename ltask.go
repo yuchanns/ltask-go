@@ -25,9 +25,15 @@ func OpenLibs(L *lua.State, lib *lua.Lib) {
 }
 
 func ltaskOpen(L *lua.State) int {
-	l := []luaLReg{}
+	l := []*lua.Reg{
+		{"pack", LuaSerdePack},
+		{"unpack", LuaSerdeUnpack},
+		{"remove", LuaSerdeRemove},
+		{"unpack_remove", LuaSerdeUnpackRemove},
+		// timer_sleep
+	}
 
-	luaLNewLib(L, l)
+	L.NewLib(l)
 	return 1
 }
 
