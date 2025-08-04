@@ -73,6 +73,10 @@ local function rethrow_error(level, errobj)
 	end
 end
 
+function ltask.sleep(ti)
+	-- TODO: timer
+end
+
 local function wait_interrupt(errobj)
 	rethrow_error(3, errobj)
 end

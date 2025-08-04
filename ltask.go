@@ -2,6 +2,7 @@ package ltask
 
 import (
 	"sync/atomic"
+	"time"
 	"unsafe"
 
 	"github.com/phuslu/log"
@@ -30,7 +31,7 @@ func ltaskOpen(L *lua.State) int {
 		{"unpack", LuaSerdeUnpack},
 		{"remove", LuaSerdeRemove},
 		{"unpack_remove", LuaSerdeUnpackRemove},
-		// timer_sleep
+		{"timer_sleep", ltaskSleep},
 	}
 
 	L.NewLib(l)
@@ -63,6 +64,12 @@ func getS(L *lua.State) *serviceUd {
 		panic("Invalid service userdata")
 	}
 	return (*serviceUd)(ud)
+}
+
+func ltaskSleep(L *lua.State) int {
+	sec := L.OptInteger(1, 0)
+	time.Sleep(time.Millisecond * time.Duration(sec))
+	return 0
 }
 
 func lself(L *lua.State) int {
