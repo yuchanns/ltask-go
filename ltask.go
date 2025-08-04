@@ -36,7 +36,9 @@ func ltaskOpen(L *lua.State) int {
 	L.NewLib(l)
 
 	l2 := []*lua.Reg{
+		{"send_message", lsendMessage},
 		{"recv_message", lrecvMessage},
+		{"message_receipt", lmessageReceipt},
 		{"self", lself},
 		{"label", ltaskLabel},
 		{"pushlog", ltaskPushLog},

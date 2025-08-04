@@ -4,7 +4,7 @@ start({
 	core = {
 		debuglog = "=", -- stdout
 	},
-	service_path = "service/?.lua;test/?.lua",
+	service_path = "testdata/service/?.lua;test/?.lua",
 	bootstrap = {
 		{
 			name = "timer",

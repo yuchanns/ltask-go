@@ -107,6 +107,48 @@ func checkField(L *lua.State, index int, key string) int64 {
 	return v
 }
 
+func lmessageReceipt(L *lua.State) int {
+	s := getS(L)
+	receipt, m := s.task.services.readReceipt(s.id)
+	if receipt == messageReceiptNone {
+		return L.Errorf("No receipt")
+	}
+	L.PushInteger(receipt)
+	if m == nil {
+		return 1
+	}
+	if receipt == messageReceiptResponse {
+		// only for schedule message NEW
+		L.PushInteger(m.to)
+		m.delete()
+		return 2
+	}
+	if m.msg == nil {
+		m.delete()
+		return 1
+	}
+	L.PushLightUserData(m.msg)
+	L.PushInteger(m.sz)
+	m.delete()
+
+	return 3
+}
+
+func lsendMessage(L *lua.State) int {
+	s := getS(L)
+	msg := genSendMessage(L, s.id)
+	if !L.IsYieldable() {
+		msg.delete()
+		return L.Errorf("Cannot send message in none-yieldable context")
+	}
+	if !s.task.services.sendMessage(s.id, msg) {
+		msg.delete()
+		return L.Errorf("Cannot send message")
+	}
+
+	return 0
+}
+
 func lrecvMessage(L *lua.State) (r int) {
 	s := getS(L)
 	m := s.task.services.popMessage(s.id)

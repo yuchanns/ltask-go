@@ -177,6 +177,29 @@ func (task *ltask) scheduleBack(id serviceId) {
 	}
 }
 
+func (p *servicePool) readReceipt(id serviceId) (receipt int64, r *message) {
+	s := p.getService(id)
+	if s == nil {
+		receipt = messageReceiptNone
+		return
+	}
+	receipt = s.receipt
+	r = s.bounce
+	s.receipt = messageReceiptNone
+	s.bounce = nil
+	return
+}
+
+func (p *servicePool) sendMessage(id serviceId, msg *message) (ok bool) {
+	s := p.getService(id)
+	if s == nil || s.out != nil {
+		return
+	}
+	s.out = msg
+	ok = true
+	return
+}
+
 func (p *servicePool) outMessage(id serviceId) (out *message) {
 	s := p.getService(id)
 	if s == nil {
