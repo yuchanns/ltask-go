@@ -44,6 +44,7 @@ func (s *Suite) TearDown() {
 }
 
 func TestSuite(t *testing.T) {
+	t.Parallel()
 	assert := require.New(t)
 
 	suite := &Suite{}
@@ -57,33 +58,34 @@ func TestSuite(t *testing.T) {
 	ents, err := os.ReadDir(testDir)
 	assert.NoError(err)
 
-	L, err := suite.lib.NewState()
-	assert.NoError(err)
-
-	L.OpenLibs()
-
-	ltask.OpenLibs(L, suite.lib)
-
-	t.Cleanup(L.Close)
-
 	for _, ent := range ents {
 		if ent.IsDir() {
 			continue
 		}
-		if !strings.HasPrefix(ent.Name(), "test_") {
+		sname := ent.Name()
+		if !strings.HasPrefix(sname, "test_") {
 			continue
 		}
-		if !strings.HasSuffix(ent.Name(), ".lua") {
+		testName := strings.TrimPrefix(sname, "test_")
+		if !strings.HasSuffix(testName, ".lua") {
 			continue
 		}
-		sname := strcase.ToCamel(strings.TrimPrefix(strings.TrimSuffix(ent.Name(), ".lua"), "test_"))
-		scode, err := os.ReadFile(fmt.Sprintf("%s/%s", testDir, ent.Name()))
-		assert.NoError(err)
+		testName = strings.TrimSuffix(testName, ".lua")
 
-		t.Run(sname, func(t *testing.T) {
+		t.Run(strcase.ToCamel(testName), func(t *testing.T) {
+			t.Parallel()
 			assert := require.New(t)
 
-			assert.NoError(L.DoString(string(scode)))
+			L, err := suite.lib.NewState()
+			assert.NoError(err)
+
+			L.OpenLibs()
+
+			ltask.OpenLibs(L, suite.lib)
+
+			t.Cleanup(L.Close)
+
+			assert.NoError(L.DoFile(fmt.Sprintf("%s/%s", testDir, sname)))
 		})
 	}
 
@@ -93,7 +95,14 @@ func TestSuite(t *testing.T) {
 		method := tt.Method(i)
 		if testFunc, ok := method.Func.Interface().(func(*Suite, *require.Assertions, *lua.State)); ok {
 			t.Run(strings.TrimPrefix(method.Name, "Test"), func(t *testing.T) {
+				t.Parallel()
 				assert := require.New(t)
+				L, err := suite.lib.NewState()
+				assert.NoError(err)
+
+				L.OpenLibs()
+
+				t.Cleanup(L.Close)
 
 				testFunc(suite, assert, L)
 			})
