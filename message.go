@@ -62,3 +62,8 @@ const (
 	messageTypeSignal   = 4
 	messageTypeIdle     = 5
 )
+
+const (
+	messageScheduleNew = 0
+	messageScheduleDel = 1
+)

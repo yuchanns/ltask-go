@@ -260,8 +260,8 @@ func (p *servicePool) hasMessage(id serviceId) (has bool) {
 	return s.msg.Len() > 0
 }
 
-func (p *servicePool) pushMessage(msg *message) (block bool) {
-	s := p.getService(msg.to)
+func (p *servicePool) pushMessage(id serviceId, msg *message) (block bool) {
+	s := p.getService(id)
 	if s == nil || s.status == serviceStatusDead {
 		return
 	}

@@ -10,16 +10,16 @@ start({
 			name = "timer",
 			unique = true,
 		},
-		{
-			name = "logger",
-			unique = true,
-		},
-		{
-			name = "sockevent",
-			unique = true,
-		},
-		{
-			name = "bootstrap",
-		},
+		-- {
+		-- 	name = "logger",
+		-- 	unique = true,
+		-- },
+		-- {
+		-- 	name = "sockevent",
+		-- 	unique = true,
+		-- },
+		-- {
+		-- 	name = "bootstrap",
+		-- },
 	},
 })

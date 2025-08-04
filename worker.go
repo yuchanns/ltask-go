@@ -132,7 +132,7 @@ func (task *ltask) quitAllWorkers() {
 func (task *ltask) dispatchExternalMessages() {
 	var send bool
 	if task.externalLastMessage != nil {
-		if task.services.pushMessage(task.externalLastMessage) {
+		if task.services.pushMessage(task.externalLastMessage.to, task.externalLastMessage) {
 			return
 		}
 		task.externalLastMessage = nil
@@ -145,15 +145,15 @@ func (task *ltask) dispatchExternalMessages() {
 		}
 		buf := serdePackString("external", msg)
 		msg, sz := mallocFromBuffer(buf)
-		m := &message{
+		m := newMessage(&message{
 			from:    0,
 			to:      1, // root
 			session: 0,
 			typ:     messageTypeRequest,
 			msg:     msg,
 			sz:      int64(sz),
-		}
-		if task.services.pushMessage(m) {
+		})
+		if task.services.pushMessage(m.to, m) {
 			// blocked, save the message for next time
 			task.externalLastMessage = m
 			return
@@ -223,7 +223,7 @@ func (task *ltask) assignPrepare(prepare []serviceId) {
 				continue
 			}
 			assign := w.assignJob(id)
-			if id == 0 {
+			if assign == 0 {
 				continue
 			}
 			w.wake()
@@ -320,7 +320,7 @@ func (task *ltask) dispatchOutMessages(doneJobs []serviceId) {
 				p.deleteService(id)
 				continue
 			}
-			if p.pushMessage(msg) {
+			if p.pushMessage(msg.to, msg) {
 				log.Debug().Msgf("Root service is blocked, service %d will try to signal it later", id)
 				task.scheduleBack(id)
 				continue
@@ -330,7 +330,7 @@ func (task *ltask) dispatchOutMessages(doneJobs []serviceId) {
 			continue
 		}
 		if msg != nil {
-			task.dispatchOutMessage(msg)
+			task.dispatchOutMessage(id, msg)
 		}
 		if status != serviceStatusDone {
 			panic("Service status is not done")
@@ -347,17 +347,45 @@ func (task *ltask) dispatchOutMessages(doneJobs []serviceId) {
 	}
 }
 
-func (task *ltask) dispatchOutMessage(msg *message) {
+func (task *ltask) dispatchScheduleMessage(id serviceId, msg *message) {
+	p := task.services
+	if id != serviceIdRoot {
+		// only root can send schedule message
+		p.writeReceipt(id, messageReceiptError, msg)
+		return
+	}
+	sid := msg.session
+	switch msg.typ {
+	case messageScheduleNew:
+		msg.to = p.newService(int64(sid))
+		log.Debug().Msgf("New service %d", msg.to)
+		if msg.to == 0 {
+			p.writeReceipt(id, messageReceiptError, msg)
+		} else {
+			p.writeReceipt(id, messageReceiptResponse, msg)
+		}
+	case messageScheduleDel:
+		log.Debug().Msgf("Delete service %d", sid)
+		p.deleteService(serviceId(sid))
+		msg.delete()
+		p.writeReceipt(id, messageReceiptDone, nil)
+	default:
+		p.writeReceipt(id, messageReceiptError, msg)
+	}
+}
+
+func (task *ltask) dispatchOutMessage(id serviceId, msg *message) {
 	p := task.services
 	if msg.to == serviceIdSystem {
+		task.dispatchScheduleMessage(id, msg)
 		return
 	}
 	if s := p.getService(msg.to); s == nil || s.status == serviceStatusDead {
-		p.writeReceipt(msg.to, messageReceiptError, msg)
-	} else if p.pushMessage(msg) {
-		p.writeReceipt(msg.to, messageReceiptBlock, msg)
+		p.writeReceipt(id, messageReceiptError, msg)
+	} else if p.pushMessage(msg.to, msg) {
+		p.writeReceipt(id, messageReceiptBlock, msg)
 	} else {
-		p.writeReceipt(msg.to, messageReceiptDone, nil)
+		p.writeReceipt(id, messageReceiptDone, nil)
 	}
 	task.checkMessageTo(msg.to)
 }

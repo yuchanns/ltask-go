@@ -73,183 +73,6 @@ local function rethrow_error(level, errobj)
 	end
 end
 
-function ltask.sleep(ti)
-	-- TODO: timer
-end
-
-local function wait_interrupt(errobj)
-	rethrow_error(3, errobj)
-end
-
-local function wait_response(type, ...)
-	if type == MESSAGE_RESPONSE then
-		return ...
-	else -- type == MESSAGE_ERROR
-		wait_interrupt(...)
-	end
-end
-
-function ltask.wait(token)
-	token = token or running_thread
-	assert(session_waiting[token] == nil)
-	session_waiting[token] = running_thread
-	session_id = session_id + 1
-	return wait_response(yield_session())
-end
-
-function ltask.wakeup(token, ...)
-	local co = session_waiting[token]
-	if co then
-		wakeup_queue[#wakeup_queue + 1] = { co, MESSAGE_RESPONSE, ... }
-		session_waiting[token] = nil
-		return true
-	end
-end
-
-local function send_blocked_message(addr, session, type, ...)
-	local msg, sz = ltask.pack("send_retry", addr, session, type, ...)
-	while true do
-		local receipt_type = ltask.post_message(SERVICE_ROOT, SESSION_SEND_MESSAGE, MESSAGE_REQUEST, msg, sz)
-		if receipt_type == RECEIPT_DONE then
-			break
-		elseif receipt_type == RECEIPT_BLOCK then
-			ltask.sleep(1)
-		else
-			-- error (root quit?)
-			ltask.remove(msg, sz)
-			break
-		end
-	end
-end
-
-local function post_response_message(addr, session, type, msg, sz)
-	local receipt_type, receipt_msg, receipt_sz = ltask.post_message(addr, session, type, msg, sz)
-	if receipt_type == RECEIPT_DONE then
-		return
-	end
-	if receipt_type == RECEIPT_ERROR then
-		ltask.remove(receipt_msg, receipt_sz)
-	else
-		-- RECEIPT_BLOCK
-		ltask.fork(function()
-			send_blocked_message(addr, session, type, ltask.unpack_remove(receipt_msg, receipt_sz))
-		end)
-	end
-end
-
-local SESSION = {}
-
-local function send_response(...)
-	local session = session_coroutine_response[running_thread]
-
-	if session ~= SESSION_SEND_MESSAGE then
-		local from = session_coroutine_address[running_thread]
-		post_response_message(from, session, MESSAGE_RESPONSE, ltask.pack(...))
-	end
-
-	-- End session
-	session_coroutine_address[running_thread] = nil
-	session_coroutine_response[running_thread] = nil
-end
-
-local service = nil
-local sys_service = {}
-
-function ltask.dispatch(handler)
-	if not handler then
-		return service
-	end
-	service = service or {}
-	-- merge handler into service
-	for k, v in pairs(handler) do
-		if type(v) == "function" then
-			assert(service[k] == nil)
-			service[k] = v
-		end
-	end
-	return service
-end
-
-local yieldable_require
-do
-	local require = _G.require
-	local loaded = package.loaded
-	local loading = {}
-	local function findloader(name)
-		local msg = ""
-		local searchers = package.searchers
-		assert(type(searchers) == "table", "'package.searchers' must be a table")
-		for _, searcher in ipairs(searchers) do
-			local f, extra = searcher(name)
-			if type(f) == "function" then
-				return f, extra
-			elseif type(f) == "string" then
-				msg = msg .. "\n\t" .. f
-			end
-		end
-		error(("module '%s' not found:%s"):format(name, msg), 3)
-	end
-	local function finish_loading(loading_queue)
-		local waiting = #loading_queue
-		if waiting > 0 then
-			for i = 1, waiting do
-				ltask.wakeup(loading_queue[i])
-			end
-		end
-		loading[loading_queue.name] = nil
-	end
-	local toclosed_loading = { __close = finish_loading }
-	local function start_loading(name, co)
-		local loading_queue = loading[name]
-		if loading_queue then
-			if loading_queue.co == co then
-				error("circular dependency", 2)
-			end
-			loading_queue[#loading_queue + 1] = co
-			ltask.wait(co)
-			return
-		end
-		loading_queue = setmetatable({ co = co, name = name }, toclosed_loading)
-		loading[name] = loading_queue
-		return loading_queue
-	end
-	function yieldable_require(name)
-		local m = loaded[name]
-		if m ~= nil then
-			return m
-		end
-		local co, main = coroutine_running()
-		if main then
-			return require(name)
-		end
-		local queue <close> = start_loading(name, co)
-		if not queue then
-			local r = loaded[name]
-			if r == nil then
-				error(("require %q failed"):format(name), 2)
-			end
-			return r
-		end
-		local initfunc, extra = findloader(name)
-		local r = initfunc(name, extra)
-		if r == nil then
-			r = true
-		end
-		loaded[name] = r
-		return r
-	end
-end
-local function sys_service_init(t)
-	_G.require = yieldable_require
-	local initfunc = assert(load(t.initfunc))
-	local func = assert(initfunc(t.name))
-	local handler = func(table.unpack(t.args))
-	ltask.dispatch(handler)
-	if service == nil then
-		ltask.quit()
-	end
-end
-
 local traceback, create_traceback
 do
 	local selfsource <const> = debug.getinfo(1, "S").source
@@ -412,6 +235,237 @@ do
 	end
 end
 
+local function send_blocked_message(addr, session, type, ...)
+	local msg, sz = ltask.pack("send_retry", addr, session, type, ...)
+	while true do
+		local receipt_type = ltask.post_message(SERVICE_ROOT, SESSION_SEND_MESSAGE, MESSAGE_REQUEST, msg, sz)
+		if receipt_type == RECEIPT_DONE then
+			break
+		elseif receipt_type == RECEIPT_BLOCK then
+			ltask.sleep(1)
+		else
+			-- error (root quit?)
+			ltask.remove(msg, sz)
+			break
+		end
+	end
+end
+
+local function post_request_message(addr, session, type, msg, sz)
+	local receipt_type, receipt_msg, receipt_sz = ltask.post_message(addr, session, type, msg, sz)
+	if receipt_type == RECEIPT_DONE then
+		return
+	end
+	if receipt_type == RECEIPT_ERROR then
+		ltask.remove(receipt_msg, receipt_sz)
+		if session ~= SESSION_SEND_MESSAGE then
+			error(string.format("{service:%d} is dead", addr))
+		end
+	else
+		--RECEIPT_BLOCK
+		ltask.remove(receipt_msg, receipt_sz)
+		error(string.format("{service:%d} is busy", addr))
+	end
+end
+
+local function post_response_message(addr, session, type, msg, sz)
+	local receipt_type, receipt_msg, receipt_sz = ltask.post_message(addr, session, type, msg, sz)
+	if receipt_type == RECEIPT_DONE then
+		return
+	end
+	if receipt_type == RECEIPT_ERROR then
+		ltask.remove(receipt_msg, receipt_sz)
+	else
+		-- RECEIPT_BLOCK
+		ltask.fork(function()
+			send_blocked_message(addr, session, type, ltask.unpack_remove(receipt_msg, receipt_sz))
+		end)
+	end
+end
+
+function ltask.syscall(address, ...)
+	post_request_message(address, session_id, MESSAGE_SYSTEM, ltask.pack(...))
+	session_coroutine_suspend_lookup[session_id] = running_thread
+	session_id = session_id + 1
+	local type, msg, sz = yield_session()
+	if type == MESSAGE_RESPONSE then
+		return ltask.unpack_remove(msg, sz)
+	end
+	-- type == MESSAGE_ERROR
+	rethrow_error(2, ltask.unpack_remove(msg, sz))
+end
+
+function ltask.sleep(ti)
+	-- TODO: timer
+end
+
+local function wait_interrupt(errobj)
+	rethrow_error(3, errobj)
+end
+
+local function wait_response(type, ...)
+	if type == MESSAGE_RESPONSE then
+		return ...
+	else -- type == MESSAGE_ERROR
+		wait_interrupt(...)
+	end
+end
+
+function ltask.wait(token)
+	token = token or running_thread
+	assert(session_waiting[token] == nil)
+	session_waiting[token] = running_thread
+	session_id = session_id + 1
+	return wait_response(yield_session())
+end
+
+function ltask.wakeup(token, ...)
+	local co = session_waiting[token]
+	if co then
+		wakeup_queue[#wakeup_queue + 1] = { co, MESSAGE_RESPONSE, ... }
+		session_waiting[token] = nil
+		return true
+	end
+end
+
+function ltask.multi_wakeup(token, ...)
+	local co = session_waiting[token]
+	if co then
+		local n = #wakeup_queue
+		for i = 1, #co do
+			wakeup_queue[n + i] = { co[i], MESSAGE_RESPONSE, ... }
+		end
+		session_waiting[token] = nil
+		return true
+	end
+end
+
+function ltask.multi_interrupt(token, errobj)
+	local co = session_waiting[token]
+	if co then
+		errobj = traceback(errobj, 4)
+		local n = #wakeup_queue
+		for i = 1, #co do
+			wakeup_queue[n + i] = { co[i], MESSAGE_ERROR, errobj }
+		end
+		session_waiting[token] = nil
+		return true
+	end
+end
+
+local SESSION = {}
+
+local function send_response(...)
+	local session = session_coroutine_response[running_thread]
+
+	if session ~= SESSION_SEND_MESSAGE then
+		local from = session_coroutine_address[running_thread]
+		post_response_message(from, session, MESSAGE_RESPONSE, ltask.pack(...))
+	end
+
+	-- End session
+	session_coroutine_address[running_thread] = nil
+	session_coroutine_response[running_thread] = nil
+end
+
+local service = nil
+local sys_service = {}
+
+function ltask.dispatch(handler)
+	if not handler then
+		return service
+	end
+	service = service or {}
+	-- merge handler into service
+	for k, v in pairs(handler) do
+		if type(v) == "function" then
+			assert(service[k] == nil)
+			service[k] = v
+		end
+	end
+	return service
+end
+
+local yieldable_require
+do
+	local require = _G.require
+	local loaded = package.loaded
+	local loading = {}
+	local function findloader(name)
+		local msg = ""
+		local searchers = package.searchers
+		assert(type(searchers) == "table", "'package.searchers' must be a table")
+		for _, searcher in ipairs(searchers) do
+			local f, extra = searcher(name)
+			if type(f) == "function" then
+				return f, extra
+			elseif type(f) == "string" then
+				msg = msg .. "\n\t" .. f
+			end
+		end
+		error(("module '%s' not found:%s"):format(name, msg), 3)
+	end
+	local function finish_loading(loading_queue)
+		local waiting = #loading_queue
+		if waiting > 0 then
+			for i = 1, waiting do
+				ltask.wakeup(loading_queue[i])
+			end
+		end
+		loading[loading_queue.name] = nil
+	end
+	local toclosed_loading = { __close = finish_loading }
+	local function start_loading(name, co)
+		local loading_queue = loading[name]
+		if loading_queue then
+			if loading_queue.co == co then
+				error("circular dependency", 2)
+			end
+			loading_queue[#loading_queue + 1] = co
+			ltask.wait(co)
+			return
+		end
+		loading_queue = setmetatable({ co = co, name = name }, toclosed_loading)
+		loading[name] = loading_queue
+		return loading_queue
+	end
+	function yieldable_require(name)
+		local m = loaded[name]
+		if m ~= nil then
+			return m
+		end
+		local co, main = coroutine_running()
+		if main then
+			return require(name)
+		end
+		local queue <close> = start_loading(name, co)
+		if not queue then
+			local r = loaded[name]
+			if r == nil then
+				error(("require %q failed"):format(name), 2)
+			end
+			return r
+		end
+		local initfunc, extra = findloader(name)
+		local r = initfunc(name, extra)
+		if r == nil then
+			r = true
+		end
+		loaded[name] = r
+		return r
+	end
+end
+local function sys_service_init(t)
+	_G.require = yieldable_require
+	local initfunc = assert(load(t.initfunc))
+	local func = assert(initfunc(t.name))
+	local handler = func(table.unpack(t.args))
+	ltask.dispatch(handler)
+	if service == nil then
+		ltask.quit()
+	end
+end
+
 local function error_handler(errobj)
 	return traceback(errobj, 4)
 end
@@ -542,6 +596,7 @@ local function schedule_message()
 		local co = session_coroutine_suspend_lookup[session]
 		if co == nil then
 			print("Unknown response session: ", session, "from", from, "type", type, ltask.unpack_remove(msg, sz))
+			quit = true -- FIXME: quit for now
 		else
 			session_coroutine_suspend_lookup[session] = nil
 			wakeup_session(co, type, session, msg, sz)
