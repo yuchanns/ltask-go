@@ -219,6 +219,7 @@ func (task *ltask) assignPrepare(prepare []serviceId) {
 				}
 			}
 			w := &task.workers[workerId]
+			workerId++
 			if !(useBusy || w.busy == 0) || !(w.binding == 0 || useBinding) {
 				continue
 			}
