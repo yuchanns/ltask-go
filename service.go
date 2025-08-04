@@ -229,6 +229,7 @@ func (p *servicePool) writeReceipt(id serviceId, receipt int64, bounce *message)
 		log.Error().Msgf("WARNING: write recipt %d fail (%d)", id, s.receipt)
 	}
 	if s != nil {
+		s.bounce.delete()
 		s.receipt = receipt
 		s.bounce = bounce
 	}
