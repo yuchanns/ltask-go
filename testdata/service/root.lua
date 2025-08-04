@@ -22,73 +22,88 @@ local named_services = {}
 local root_quit = ltask.quit
 ltask.quit = function() end
 
+do
+  -- root init response to iteself
+  local function init_receipt(type, msg, sz)
+    local errobj = ltask.unpack_remove(msg, sz)
+    if type == MESSAGE_ERROR then
+      ltask.log.error("Root fatal:", table.concat(errobj, "\n"))
+      -- writelog()
+      root_quit()
+    end
+  end
+
+  --- The session of root init message must be 1
+  ltask.suspend(1, init_receipt)
+end
+
 local function register_service(address, name)
-	if named_services[name] then
-		error(("Name `%s` already exists."):format(name))
-	end
-	anonymous_services[address] = nil
-	named_services[#named_services + 1] = name
-	named_services[name] = address
-	ltask.multi_wakeup("unique." .. name, address)
+  if named_services[name] then
+    error(("Name `%s` already exists."):format(name))
+  end
+  anonymous_services[address] = nil
+  named_services[#named_services + 1] = name
+  named_services[name] = address
+  ltask.multi_wakeup("unique." .. name, address)
 end
 
 local function spawn(t)
-	local type, address = ltask.post_message(SERVICE_SYSTEM, 0, MESSAGE_SCHEDULE_NEW)
-	if type ~= RECEIPT_RESPONCE then
-		error("send MESSAGE_SCHEDULE_NEW failed.")
-	end
-	anonymous_services[address] = true
-	assert(root.init_service(address, t.name, config.service_source, config.service_chunkname, t.worker_id))
-	ltask.syscall(address, "init", {
-		initfunc = t.initfunc or config.initfunc,
-		name = t.name,
-		args = t.args or {},
-	})
-	return address
+  local type, address = ltask.post_message(SERVICE_SYSTEM, 0, MESSAGE_SCHEDULE_NEW)
+  if type ~= RECEIPT_RESPONCE then
+    error("send MESSAGE_SCHEDULE_NEW failed.")
+  end
+  anonymous_services[address] = true
+  assert(root.init_service(address, t.name, config.service_source, config.service_chunkname, t.worker_id))
+  ltask.syscall(address, "init", {
+    initfunc = t.initfunc or config.initfunc,
+    name = t.name,
+    args = t.args or {},
+  })
+  return address
 end
 
 local unique = {}
 
 local function spawn_unique(t)
-	local address = named_services[t.name]
-	if address then
-		return address
-	end
-	local key = "unique." .. t.name
-	if not unique[t.name] then
-		unique[t.name] = true
-		ltask.fork(function()
-			local ok, addr = pcall(spawn, t)
-			if not ok then
-				local err = addr
-				ltask.multi_interrupt(key, err)
-				unique[t.name] = nil
-				return
-			end
-			register_service(addr, t.name)
-			unique[t.name] = nil
-		end)
-	end
+  local address = named_services[t.name]
+  if address then
+    return address
+  end
+  local key = "unique." .. t.name
+  if not unique[t.name] then
+    unique[t.name] = true
+    ltask.fork(function()
+      local ok, addr = pcall(spawn, t)
+      if not ok then
+        local err = addr
+        ltask.multi_interrupt(key, err)
+        unique[t.name] = nil
+        return
+      end
+      register_service(addr, t.name)
+      unique[t.name] = nil
+    end)
+  end
 end
 
 local function quit()
-	if next(anonymous_services) ~= nil then
-		return
-	end
-	-- TODO: ltask.send
+  if next(anonymous_services) ~= nil then
+    return
+  end
+  -- TODO: ltask.send
 end
 
 function S.spawn_service(t)
-	if t.unique then
-		return spawn_unique(t)
-	end
-	return spawn(t)
+  if t.unique then
+    return spawn_unique(t)
+  end
+  return spawn(t)
 end
 
 local function bootstrap()
-	for _, t in ipairs(config.bootstrap) do
-		S.spawn_service(t)
-	end
+  for _, t in ipairs(config.bootstrap) do
+    S.spawn_service(t)
+  end
 end
 
 ltask.dispatch(S)
