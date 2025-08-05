@@ -234,9 +234,9 @@ func ltaskRun(L *lua.State) int {
 
 	var mainThread *workerThread
 
-	for i := range task.workers {
+	for i := range *task.workers {
 		if useMainThread && int64(i) == mainThreadId {
-			mainThread = &task.workers[i]
+			mainThread = &(*task.workers)[i]
 			continue
 		}
 
@@ -245,7 +245,7 @@ func ltaskRun(L *lua.State) int {
 			defer wg.Done()
 
 			w.start()
-		}(&task.workers[i])
+		}(&(*task.workers)[i])
 	}
 
 	if useMainThread && mainThread != nil {
@@ -264,12 +264,12 @@ func ltaskWait(L *lua.State) int {
 	ctx.wg.Wait()
 
 	ctx.task.lqueue.delete()
-	for i := range ctx.task.event {
-		for ctx.task.event[i].Len() > 0 {
-			ctx.task.event[i].Pop()
+	for i := range *ctx.task.event {
+		for (*ctx.task.event)[i].Len() > 0 {
+			(*ctx.task.event)[i].Pop()
 		}
-		malloc.Free(unsafe.Pointer(ctx.task.event[i]))
-		ctx.task.event[i] = nil
+		malloc.Free(unsafe.Pointer((*ctx.task.event)[i]))
+		(*ctx.task.event)[i] = nil
 	}
 
 	ctx.task.externalLastMessage = nil
@@ -287,8 +287,8 @@ func ltaskWait(L *lua.State) int {
 func ltaskDeinit(L *lua.State) int {
 	task := getPtr[ltask](L, "LTASK_GLOBAL")
 
-	for i := range task.workers {
-		w := &task.workers[i]
+	for i := range *task.workers {
+		w := &(*task.workers)[i]
 		w.destroy()
 	}
 	task.services.destroy()
