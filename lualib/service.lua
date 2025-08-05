@@ -31,7 +31,7 @@ for _, level in ipairs({ "info", "error" }) do
   end
 end
 
-ltask.log.info("startup" .. CURRENT_SERVICE)
+ltask.log.info("startup " .. CURRENT_SERVICE)
 
 local coroutine_create = coroutine.create
 local coroutine_resume = coroutine.resume
@@ -578,7 +578,7 @@ local function schedule_message()
   end
 end
 
--- print = ltask.log.info
+print = ltask.log.info
 
 local function mainloop()
   while true do

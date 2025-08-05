@@ -51,6 +51,18 @@ func ltaskInit(L *lua.State) int {
 	return 1
 }
 
+func ltaskBootPushLog(L *lua.State) int {
+	L.CheckType(1, lua.LUA_TLIGHTUSERDATA)
+	task := getPtr[ltask](L, "LTASK_GLOBAL")
+	data := L.ToUserData(1)
+	sz := L.CheckInteger(2)
+	if !task.pushLog(serviceIdSystem, data, sz) {
+		return L.Errorf("log error")
+	}
+
+	return 0
+}
+
 func ltaskInitTimer(L *lua.State) int {
 	task := getPtr[ltask](L, "LTASK_GLOBAL")
 	if task.timer != nil {
@@ -251,6 +263,7 @@ func ltaskWait(L *lua.State) int {
 	ctx := (*taskContext)(L.ToUserData(1))
 	ctx.wg.Wait()
 
+	ctx.task.lqueue.delete()
 	for i := range ctx.task.event {
 		for ctx.task.event[i].Len() > 0 {
 			ctx.task.event[i].Pop()
@@ -306,6 +319,7 @@ func ltaskBootstrapOpen(L *lua.State) int {
 		{"new_service", ltaskNewService},
 		{"init_timer", ltaskInitTimer},
 		{"init_root", ltaskInitRoot},
+		{"pushlog", ltaskBootPushLog},
 		// We don't need `init_socket` here, as it is proceed by Go runtime automatically.
 		{"pack", LuaSerdePack},
 		{"unpack", LuaSerdeUnpack},

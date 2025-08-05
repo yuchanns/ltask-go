@@ -22,13 +22,24 @@ local named_services = {}
 local root_quit = ltask.quit
 ltask.quit = function() end
 
+local function writelog()
+  while true do
+    local ti, _, msg, sz = ltask.poplog()
+    if ti == nil then break end
+    local tsec = ti // 100
+    local msec = ti % 100
+    local level, message = ltask.unpack_remove(msg, sz)
+    io.write(string.format("[%s.%02d][%-5s]%s\n", os.date("%Y-%m-%d %H:%M:%S", tsec), msec, level:upper(), message))
+  end
+end
+
 do
   -- root init response to iteself
   local function init_receipt(type, msg, sz)
     local errobj = ltask.unpack_remove(msg, sz)
     if type == MESSAGE_ERROR then
       ltask.log.error("Root fatal:", table.concat(errobj, "\n"))
-      -- writelog()
+      writelog()
       root_quit()
     end
   end
@@ -108,6 +119,7 @@ function S.quit_ltask()
     local ok, err = pcall(ltask.syscall, address, "quit")
     if not ok then print(string.format("named service %s(%d) quit error: %s.", name, address, err)) end
   end
+  writelog()
   root_quit()
 end
 

@@ -43,6 +43,7 @@ func ltaskOpen(L *lua.State) int {
 		{"self", lself},
 		{"label", ltaskLabel},
 		{"pushlog", ltaskPushLog},
+		{"poplog", ltaskPopLog},
 	}
 
 	typ, _ := L.GetField(lua.LUA_REGISTRYINDEX, "LTASK_ID")
@@ -87,24 +88,39 @@ func ltaskLabel(L *lua.State) int {
 
 func ltaskPushLog(L *lua.State) int {
 	L.CheckType(1, lua.LUA_TLIGHTUSERDATA)
-	// data := L.ToUserData(1)
-	// sz := L.CheckInteger(2)
-	// s := getS(L)
-	// TODO: logqueue
-	//
+	data := L.ToUserData(1)
+	sz := L.CheckInteger(2)
+	s := getS(L)
+	if !s.task.pushLog(s.id, data, sz) {
+		return L.Errorf("log error")
+	}
 
 	return 0
 }
 
+func ltaskPopLog(L *lua.State) int {
+	s := getS(L)
+	m, ok := s.task.lqueue.pop()
+	if !ok {
+		return 0
+	}
+	// TODO: timer_starttime
+	L.PushInteger(m.timestamp)
+	L.PushInteger(m.id)
+	L.PushLightUserData(m.msg)
+	L.PushInteger(m.sz)
+	return 4
+}
+
 type ltask struct {
-	config    *ltaskConfig
-	workers   []workerThread
-	eventInit []atomicInt
-	event     []*xxchan.Channel[struct{}]
-	services  *servicePool
-	schedule  *xxchan.Channel[int]
-	timer     *timer
-	// TODO: logqueue?
+	config              *ltaskConfig
+	workers             []workerThread
+	eventInit           []atomicInt
+	event               []*xxchan.Channel[struct{}]
+	services            *servicePool
+	schedule            *xxchan.Channel[int]
+	timer               *timer
+	lqueue              *logQueue
 	externalMessage     *xxchan.Channel[unsafe.Pointer]
 	externalLastMessage *message
 	scheduleOwner       atomicInt
@@ -114,10 +130,24 @@ type ltask struct {
 	// TODO: logfile?
 }
 
+func (task *ltask) pushLog(id serviceId, data unsafe.Pointer, sz int64) (ok bool) {
+	now := time.Now()
+	sec := now.Unix()
+	nsec := now.Nanosecond()
+	csec := sec*100 + int64(nsec/10_000_000)
+	return task.lqueue.push(&logMessage{
+		id:  id,
+		msg: data,
+		sz:  sz,
+		// TODO: use timer_now
+		timestamp: csec,
+	})
+}
+
 func (task *ltask) init(L *lua.State, config *ltaskConfig) {
 	task = (*ltask)(L.NewUserDataUv(int(unsafe.Sizeof(*task)), 0))
 	L.SetField(lua.LUA_REGISTRYINDEX, "LTASK_GLOBAL")
-	// task.logqueue
+	task.lqueue = newLogQueue()
 	task.config = config
 
 	task.initWorker(L)
