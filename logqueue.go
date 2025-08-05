@@ -35,14 +35,14 @@ func newLogQueue() *logQueue {
 	return q
 }
 
-func (q logQueue) acquireLock() {
+func (q *logQueue) acquireLock() {
 	for !atomic.CompareAndSwapInt32(&q.l, 0, 1) {
 		log.Debug().Msgf("logQueue acquireLock failed, waiting...%d", q.l)
 		runtime.Gosched()
 	}
 }
 
-func (q logQueue) releaseLock() {
+func (q *logQueue) releaseLock() {
 	atomic.StoreInt32(&q.l, 0)
 }
 
