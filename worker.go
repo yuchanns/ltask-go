@@ -118,14 +118,14 @@ func (w *workerThread) dispatch() {
 }
 
 func (task *ltask) wakeupAlWorkers() {
-	for i := range task.workers {
-		task.workers[i].wake()
+	for i := range *task.workers {
+		(*task.workers)[i].wake()
 	}
 }
 
 func (task *ltask) quitAllWorkers() {
-	for i := range task.workers {
-		task.workers[i].termSignal = 1
+	for i := range *task.workers {
+		(*task.workers)[i].termSignal = 1
 	}
 }
 
@@ -166,10 +166,10 @@ func (task *ltask) dispatchExternalMessages() {
 }
 
 func (task *ltask) collectDoneJobs() (done []serviceId) {
-	for i := range task.workers {
-		job := task.workers[i].doneJob()
+	for i := range *task.workers {
+		job := (*task.workers)[i].doneJob()
 		if job != 0 {
-			log.Debug().Msgf("Worker %d done service %d", task.workers[i].workerId, job)
+			log.Debug().Msgf("Worker %d done service %d", (*task.workers)[i].workerId, job)
 			done = append(done, job)
 		}
 	}
@@ -181,8 +181,8 @@ func (task *ltask) triggerBlockedWorkers() {
 		return
 	}
 	var blocked int64
-	for i := range task.workers {
-		w := &task.workers[i]
+	for i := range *task.workers {
+		w := &(*task.workers)[i]
 		if w.waiting == 0 {
 			continue
 		}
@@ -209,7 +209,7 @@ func (task *ltask) assignPrepare(prepare []serviceId) {
 	for i := range prepare {
 		id := prepare[i]
 		for {
-			if workerId >= len(task.workers) {
+			if workerId >= len(*task.workers) {
 				if !useBusy {
 					useBusy = true
 					workerId = 0
@@ -218,7 +218,7 @@ func (task *ltask) assignPrepare(prepare []serviceId) {
 					workerId = 0
 				}
 			}
-			w := &task.workers[workerId]
+			w := &(*task.workers)[workerId]
 			workerId++
 			if !(useBusy || w.busy == 0) || !(w.binding == 0 || useBinding) {
 				continue
@@ -251,7 +251,7 @@ func (task *ltask) prepare(prepare []serviceId, freeSlots int) []serviceId {
 			prepare = append(prepare, id)
 			continue
 		}
-		w := &task.workers[worker]
+		w := &(*task.workers)[worker]
 		if !w.bindingQueue.Push(id) {
 			// binding queue is full, we can't bind this service
 			task.schedule.Push(job)
@@ -270,8 +270,8 @@ func (task *ltask) prepare(prepare []serviceId, freeSlots int) []serviceId {
 }
 
 func (task *ltask) countFreeSlots() (slots int) {
-	for i := range task.workers {
-		w := &task.workers[i]
+	for i := range *task.workers {
+		w := &(*task.workers)[i]
 		if w.serviceReady != 0 {
 			continue
 		}
@@ -291,8 +291,8 @@ func (task *ltask) countFreeSlots() (slots int) {
 }
 
 func (task *ltask) getPendingJobs() (pending []serviceId) {
-	for i := range task.workers {
-		w := &task.workers[i]
+	for i := range *task.workers {
+		w := &(*task.workers)[i]
 		if w.busy == 0 {
 			continue
 		}
@@ -433,8 +433,8 @@ func (w *workerThread) schedule() (noJob bool) {
 }
 
 func (w *workerThread) stealJob() (job serviceId) {
-	for i := range w.task.workers {
-		job = w.task.workers[i].stolen()
+	for i := range *w.task.workers {
+		job = (*w.task.workers)[i].stolen()
 		if job != 0 {
 			break
 		}

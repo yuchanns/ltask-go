@@ -133,9 +133,9 @@ func ltaskPopLog(L *lua.State) int {
 
 type ltask struct {
 	config              *ltaskConfig
-	workers             []workerThread
-	eventInit           []atomicInt
-	event               []*xxchan.Channel[struct{}]
+	workers             *[]workerThread
+	eventInit           *[]atomicInt
+	event               *[]*xxchan.Channel[struct{}]
 	services            *servicePool
 	schedule            *xxchan.Channel[int]
 	timer               *timer
@@ -200,14 +200,14 @@ func (task *ltask) init(L *lua.State, config *ltaskConfig) {
 
 	event := make([]*xxchan.Channel[struct{}], maxSockEvent)
 	eventInit := make([]atomicInt, maxSockEvent)
-	task.eventInit = eventInit
+	task.eventInit = &eventInit
 	for i := range event {
 		ptr := malloc.Alloc(uint(xxchan.Sizeof[struct{}](1)))
 		ch := xxchan.Make[struct{}](ptr, 1)
 		event[i] = ch
-		atomic.StoreInt64(&task.eventInit[i], 0)
+		atomic.StoreInt64(&(*task.eventInit)[i], 0)
 	}
-	task.event = event
+	task.event = &event
 }
 
 func (task *ltask) initWorker(L *lua.State) {
@@ -219,11 +219,12 @@ func (task *ltask) initWorker(L *lua.State) {
 		)),
 		task.config.worker,
 	)
-	task.workers = workers
+	task.workers = &workers
 	L.SetField(lua.LUA_REGISTRYINDEX, "LTASK_WORKERS")
 
 	for id := range task.config.worker {
-		task.workers[id].init(task, id)
+		worker := &(*task.workers)[id]
+		worker.init(task, id)
 	}
 }
 
