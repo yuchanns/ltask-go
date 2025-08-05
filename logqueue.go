@@ -119,7 +119,9 @@ func (q *logQueue) delete() {
 		if !ok {
 			break
 		}
-		malloc.Free(unsafe.Pointer(m.msg))
+		if m.msg != nil {
+			malloc.Free(unsafe.Pointer(m.msg))
+		}
 	}
 	q.freeItems(q.freeList)
 	malloc.Free(unsafe.Pointer(q))
