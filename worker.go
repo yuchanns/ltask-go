@@ -578,7 +578,7 @@ func (w *workerThread) start() {
 					w.task.wakeupAlWorkers()
 					break
 				}
-				//
+				w.task.services.sendSignal(id)
 			} else {
 				p.setStatus(id, serviceStatusDone)
 			}
