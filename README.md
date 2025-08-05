@@ -14,6 +14,22 @@ A showcase of how to build a lua library with [go.yuchanns.xyz/lua](https://gith
 go get go.yuchanns.xyz/ltask
 ```
 
+---
+**ltask embedded Lua code**
+
+ltask is composed of Go code and a set of Lua glue code. The Lua glue code is embedded in the Go binary during compilation.
+
+When using ltask, you can load the embedded Lua modules via `ltask.bootstrap`. For example, if you want to load the `bootstrap.lua` from `lualib`:
+
+```lua
+local boot = require("ltask.bootstrap")
+local bootstrap = load(boot.lualib("bootstrap"))()
+-- now you can use the bootstrap to start ltask.
+local ctx = bootstrap.start({})
+bootstrap.wait(ctx)
+```
+
+---
 **Go usage**
 
 ```go
