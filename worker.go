@@ -1,6 +1,7 @@
 package ltask
 
 import (
+	"runtime"
 	"sync/atomic"
 	"unsafe"
 
@@ -533,6 +534,7 @@ func (w *workerThread) start() {
 
 			for {
 				if !w.acquireScheduler() {
+					runtime.Gosched()
 					continue
 				}
 				noJob = w.schedule()
@@ -602,6 +604,7 @@ func (w *workerThread) start() {
 				// Still unable to complete job, try to dispatch
 				w.dispatch()
 				for !w.completeJob() {
+					runtime.Gosched()
 				}
 			}
 			w.schedule()

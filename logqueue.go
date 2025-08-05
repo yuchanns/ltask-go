@@ -1,9 +1,11 @@
 package ltask
 
 import (
+	"runtime"
 	"sync/atomic"
-	"time"
 	"unsafe"
+
+	"github.com/phuslu/log"
 )
 
 type logMessage struct {
@@ -28,13 +30,15 @@ type logQueue struct {
 func newLogQueue() *logQueue {
 	var q *logQueue
 	q = (*logQueue)(malloc.Alloc(uint(unsafe.Sizeof(*q))))
+	atomic.StoreInt32(&q.l, 0)
 
 	return q
 }
 
 func (q logQueue) acquireLock() {
 	for !atomic.CompareAndSwapInt32(&q.l, 0, 1) {
-		time.Sleep(time.Microsecond) // Spin-wait with brief pause
+		log.Debug().Msgf("logQueue acquireLock failed, waiting...%d", q.l)
+		runtime.Gosched()
 	}
 }
 
