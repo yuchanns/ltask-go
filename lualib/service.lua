@@ -42,9 +42,7 @@ local coroutine_yield = coroutine.yield
 local yield_service = coroutine.yield
 local yield_session = coroutine.yield
 
-local function continue_session()
-  coroutine_yield(true)
-end
+local function continue_session() coroutine_yield(true) end
 
 _G.coroutine = nil
 
@@ -59,9 +57,7 @@ local session_waiting = {}
 local wakeup_queue = {}
 
 local error_mt = {}
-function error_mt:__tostring()
-  return table.concat(self, "\n")
-end
+function error_mt:__tostring() return table.concat(self, "\n") end
 
 local function rethrow_error(level, errobj)
   if type(errobj) ~= "table" then
@@ -80,7 +76,7 @@ do
     local maxlen <const> = 60
     local type = source:byte(1)
     if
-        type == 61 --[['=']]
+      type == 61 --[['=']]
     then
       if #source <= maxlen then
         return source:sub(2)
@@ -88,7 +84,7 @@ do
         return source:sub(2, maxlen)
       end
     elseif
-        type == 64 --[['@']]
+      type == 64 --[['@']]
     then
       if #source <= maxlen then
         return source:sub(2)
@@ -102,35 +98,23 @@ do
         return ('[string "%s"]'):format(source)
       else
         local n = #source
-        if nl ~= nil then
-          n = nl - 1
-        end
-        if n > maxlen then
-          n = maxlen
-        end
+        if nl ~= nil then n = nl - 1 end
+        if n > maxlen then n = maxlen end
         return ('[string "%s..."]'):format(source:sub(1, n))
       end
     end
   end
   local function findfield(t, f, level)
-    if level == 0 or type(t) ~= "table" then
-      return
-    end
+    if level == 0 or type(t) ~= "table" then return end
     for key, value in pairs(t) do
       if type(key) == "string" and not (level == 2 and key == "_G") then
-        if value == f then
-          return key
-        end
+        if value == f then return key end
         local res = findfield(value, f, level - 1)
-        if res then
-          return key .. "." .. res
-        end
+        if res then return key .. "." .. res end
       end
     end
   end
-  local function pushglobalfuncname(f)
-    return findfield(_G, f, 2)
-  end
+  local function pushglobalfuncname(f) return findfield(_G, f, 2) end
   local function pushfuncname(info)
     local funcname = pushglobalfuncname(info.func)
     if funcname then
@@ -154,18 +138,12 @@ do
         s[#s] = nil
         break
       end
-      if #s > 0 and selfsource == info.source then
-        goto continue
-      end
+      if #s > 0 and selfsource == info.source then goto continue end
       s[#s + 1] = ("\t%s:"):format(getshortsrc(info.source))
-      if info.currentline > 0 then
-        s[#s + 1] = ("%d:"):format(info.currentline)
-      end
+      if info.currentline > 0 then s[#s + 1] = ("%d:"):format(info.currentline) end
       s[#s + 1] = " in "
       s[#s + 1] = pushfuncname(info)
-      if info.istailcall then
-        s[#s + 1] = "\n\t(...tail calls...)"
-      end
+      if info.istailcall then s[#s + 1] = "\n\t(...tail calls...)" end
       s[#s + 1] = "\n"
       ::continue::
       depth = depth + 1
@@ -183,9 +161,7 @@ do
       local depth = level or 0
       while true do
         local info = debug.getinfo(co, depth, "Sl")
-        if not info then
-          break
-        end
+        if not info then break end
         if info.what ~= "C" and info.source == where_src and where_line == info.currentline then
           return message, depth
         end
@@ -253,14 +229,10 @@ end
 
 local function post_request_message(addr, session, type, msg, sz)
   local receipt_type, receipt_msg, receipt_sz = ltask.post_message(addr, session, type, msg, sz)
-  if receipt_type == RECEIPT_DONE then
-    return
-  end
+  if receipt_type == RECEIPT_DONE then return end
   if receipt_type == RECEIPT_ERROR then
     ltask.remove(receipt_msg, receipt_sz)
-    if session ~= SESSION_SEND_MESSAGE then
-      error(string.format("{service:%d} is dead", addr))
-    end
+    if session ~= SESSION_SEND_MESSAGE then error(string.format("{service:%d} is dead", addr)) end
   else
     --RECEIPT_BLOCK
     ltask.remove(receipt_msg, receipt_sz)
@@ -270,17 +242,17 @@ end
 
 local function post_response_message(addr, session, type, msg, sz)
   local receipt_type, receipt_msg, receipt_sz = ltask.post_message(addr, session, type, msg, sz)
-  if receipt_type == RECEIPT_DONE then
-    return
-  end
+  if receipt_type == RECEIPT_DONE then return end
   if receipt_type == RECEIPT_ERROR then
     ltask.remove(receipt_msg, receipt_sz)
   else
     -- RECEIPT_BLOCK
-    ltask.fork(function()
-      send_blocked_message(addr, session, type, ltask.unpack_remove(receipt_msg, receipt_sz))
-    end)
+    ltask.fork(function() send_blocked_message(addr, session, type, ltask.unpack_remove(receipt_msg, receipt_sz)) end)
   end
+end
+
+function ltask.send(address, ...)
+  post_request_message(address, SESSION_SEND_MESSAGE, MESSAGE_RESPONSE, ltask.pack(...))
 end
 
 function ltask.syscall(address, ...)
@@ -288,9 +260,7 @@ function ltask.syscall(address, ...)
   session_coroutine_suspend_lookup[session_id] = running_thread
   session_id = session_id + 1
   local type, msg, sz = yield_session()
-  if type == MESSAGE_RESPONSE then
-    return ltask.unpack_remove(msg, sz)
-  end
+  if type == MESSAGE_RESPONSE then return ltask.unpack_remove(msg, sz) end
   -- type == MESSAGE_ERROR
   rethrow_error(2, ltask.unpack_remove(msg, sz))
 end
@@ -299,9 +269,7 @@ function ltask.sleep(ti)
   -- TODO: timer
 end
 
-local function wait_interrupt(errobj)
-  rethrow_error(3, errobj)
-end
+local function wait_interrupt(errobj) rethrow_error(3, errobj) end
 
 local function wait_response(type, ...)
   if type == MESSAGE_RESPONSE then
@@ -368,17 +336,13 @@ local function send_response(...)
   session_coroutine_response[running_thread] = nil
 end
 
-function ltask.suspend(session, func)
-  session_coroutine_suspend_lookup[session] = coroutine_create(func)
-end
+function ltask.suspend(session, func) session_coroutine_suspend_lookup[session] = coroutine_create(func) end
 
 local service = nil
 local sys_service = {}
 
 function ltask.dispatch(handler)
-  if not handler then
-    return service
-  end
+  if not handler then return service end
   service = service or {}
   -- merge handler into service
   for k, v in pairs(handler) do
@@ -422,9 +386,7 @@ do
   local function start_loading(name, co)
     local loading_queue = loading[name]
     if loading_queue then
-      if loading_queue.co == co then
-        error("circular dependency", 2)
-      end
+      if loading_queue.co == co then error("circular dependency", 2) end
       loading_queue[#loading_queue + 1] = co
       ltask.wait(co)
       return
@@ -435,26 +397,18 @@ do
   end
   function yieldable_require(name)
     local m = loaded[name]
-    if m ~= nil then
-      return m
-    end
+    if m ~= nil then return m end
     local co, main = coroutine_running()
-    if main then
-      return require(name)
-    end
+    if main then return require(name) end
     local queue <close> = start_loading(name, co)
     if not queue then
       local r = loaded[name]
-      if r == nil then
-        error(("require %q failed"):format(name), 2)
-      end
+      if r == nil then error(("require %q failed"):format(name), 2) end
       return r
     end
     local initfunc, extra = findloader(name)
     local r = initfunc(name, extra)
-    if r == nil then
-      r = true
-    end
+    if r == nil then r = true end
     loaded[name] = r
     return r
   end
@@ -465,35 +419,25 @@ local function sys_service_init(t)
   local func = assert(initfunc(t.name))
   local handler = func(table.unpack(t.args))
   ltask.dispatch(handler)
-  if service == nil then
-    ltask.quit()
-  end
+  if service == nil then ltask.quit() end
 end
 
-local function error_handler(errobj)
-  return traceback(errobj, 4)
-end
+local function error_handler(errobj) return traceback(errobj, 4) end
 
 function sys_service.init(t)
   local ok, errobj = xpcall(sys_service_init, error_handler, t)
-  if ok then
-    return
-  end
+  if ok then return end
   ltask.quit()
   rethrow_error(1, errobj)
 end
 
 local function system(command, ...)
   local s = sys_service[command]
-  if not s then
-    error("Unknown system command: " .. command)
-  end
+  if not s then error("Unknown system command: " .. command) end
   send_response(s(...))
 end
 
-SESSION[MESSAGE_SYSTEM] = function(type, msg, sz)
-  system(ltask.unpack_remove(msg, sz))
-end
+SESSION[MESSAGE_SYSTEM] = function(type, msg, sz) system(ltask.unpack_remove(msg, sz)) end
 
 function ltask.post_message(addr, session, type, msg, sz)
   ltask.send_message(addr, session, type, msg, sz)
@@ -502,9 +446,7 @@ function ltask.post_message(addr, session, type, msg, sz)
 end
 
 function ltask.rasie_error(addr, session, message)
-  if session == SESSION_SEND_MESSAGE then
-    return
-  end
+  if session == SESSION_SEND_MESSAGE then return end
   local errobj = traceback(message, 4)
   post_response_message(addr, session, MESSAGE_ERROR, ltask.pack(errobj))
 end
