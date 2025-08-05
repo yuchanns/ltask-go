@@ -1,6 +1,10 @@
 package ltask
 
 import (
+	"fmt"
+	"io"
+	"os"
+	"strings"
 	"sync/atomic"
 	"time"
 	"unsafe"
@@ -9,6 +13,21 @@ import (
 	"go.yuchanns.xyz/lua"
 	"go.yuchanns.xyz/xxchan"
 )
+
+func init() {
+	log.DefaultLogger = log.Logger{
+		Level:      log.DebugLevel,
+		Caller:     1,
+		TimeFormat: "2006-01-02 15:04:05.00",
+		Writer: &log.ConsoleWriter{
+			ColorOutput: false,
+			Formatter: func(w io.Writer, a *log.FormatterArgs) (n int, err error) {
+				return fmt.Fprintf(w, "[%s][%s]( %s ) %s\n%s", a.Time, strings.ToUpper(a.Level), a.Caller, a.Message, a.Stack)
+			},
+			Writer: os.Stderr,
+		},
+	}
+}
 
 var luaLib *lua.Lib
 
