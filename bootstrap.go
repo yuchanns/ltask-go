@@ -1,6 +1,8 @@
 package ltask
 
 import (
+	"embed"
+	"fmt"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -23,6 +25,19 @@ func getPtr[T any](L *lua.State, key string) *T {
 	L.Pop(1)
 
 	return (*T)(v)
+}
+
+//go:embed lualib
+var lualib embed.FS
+
+func ltaskLualib(L *lua.State) int {
+	fileName := L.CheckString(1)
+	scode, err := lualib.ReadFile(fmt.Sprintf("lualib/%s.lua", fileName))
+	if err != nil {
+		return L.Errorf("Cannot read lualib file %s: %v", fileName, err)
+	}
+	L.PushString(string(scode))
+	return 1
 }
 
 func ltaskInit(L *lua.State) int {
@@ -311,6 +326,7 @@ func ltaskBootstrapOpen(L *lua.State) int {
 		return L.Errorf("ltask.bootstrap can only require once")
 	}
 	l := []*lua.Reg{
+		{"lualib", ltaskLualib},
 		{"init", ltaskInit},
 		{"deinit", ltaskDeinit},
 		{"run", ltaskRun},

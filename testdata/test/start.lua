@@ -1,12 +1,5 @@
 local boot = require("ltask.bootstrap")
 
-local function searchpath(name) return assert(package.searchpath(name, "lualib/?.lua")) end
-
-local function readall(path)
-  local f <close> = assert(io.open(path))
-  return f:read("a")
-end
-
 function print(...)
   local t = table.pack(...)
   local str = {}
@@ -18,11 +11,10 @@ function print(...)
 end
 
 return function(config)
-  local servicepath = searchpath("service")
   local root_config = {
     bootstrap = config.bootstrap,
-    service_source = readall(servicepath),
-    service_chunkname = "@" .. servicepath,
+    service_source = boot.lualib("service"),
+    service_chunkname = "@lualib/service.lua",
     initfunc = ([=[
 local name = ...
 package.path = [[${lua_path}]]
@@ -38,7 +30,7 @@ return loadfile(filename)
       service_path = config.service_path,
     }),
   }
-  local bootstrap = dofile(searchpath("bootstrap"))
+  local bootstrap = load(boot.lualib("bootstrap"))()
   local ctx = bootstrap.start({
     core = config.core or {},
     root = root_config,
