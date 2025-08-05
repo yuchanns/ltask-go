@@ -31,11 +31,21 @@ func newLogQueue() *logQueue {
 	var q *logQueue
 	q = (*logQueue)(malloc.Alloc(uint(unsafe.Sizeof(*q))))
 	atomic.StoreInt32(&q.l, 0)
+	q.freeList = nil
+	q.head = nil
+	q.tail = nil
 
 	return q
 }
 
+func (q *logQueue) assert() {
+	if q == nil {
+		panic("logQueue is nil")
+	}
+}
+
 func (q *logQueue) acquireLock() {
+	q.assert()
 	for !atomic.CompareAndSwapInt32(&q.l, 0, 1) {
 		log.Debug().Msgf("logQueue acquireLock failed, waiting...%d", q.l)
 		runtime.Gosched()
@@ -43,10 +53,12 @@ func (q *logQueue) acquireLock() {
 }
 
 func (q *logQueue) releaseLock() {
+	q.assert()
 	atomic.StoreInt32(&q.l, 0)
 }
 
 func (q *logQueue) allocItem() (ret *logItem) {
+	q.assert()
 	ret = q.freeList
 	if ret == nil {
 		ret = (*logItem)(malloc.Alloc(uint(unsafe.Sizeof(*ret))))
@@ -114,6 +126,7 @@ func (q *logQueue) freeItems(item *logItem) {
 }
 
 func (q *logQueue) delete() {
+	q.assert()
 	for {
 		m, ok := q.pop()
 		if !ok {
