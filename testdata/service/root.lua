@@ -38,9 +38,7 @@ do
 end
 
 local function register_service(address, name)
-  if named_services[name] then
-    error(("Name `%s` already exists."):format(name))
-  end
+  if named_services[name] then error(("Name `%s` already exists."):format(name)) end
   anonymous_services[address] = nil
   named_services[#named_services + 1] = name
   named_services[name] = address
@@ -49,9 +47,7 @@ end
 
 local function spawn(t)
   local type, address = ltask.post_message(SERVICE_SYSTEM, 0, MESSAGE_SCHEDULE_NEW)
-  if type ~= RECEIPT_RESPONCE then
-    error("send MESSAGE_SCHEDULE_NEW failed.")
-  end
+  if type ~= RECEIPT_RESPONCE then error("send MESSAGE_SCHEDULE_NEW failed.") end
   anonymous_services[address] = true
   assert(root.init_service(address, t.name, config.service_source, config.service_chunkname, t.worker_id))
   ltask.syscall(address, "init", {
@@ -66,9 +62,7 @@ local unique = {}
 
 local function spawn_unique(t)
   local address = named_services[t.name]
-  if address then
-    return address
-  end
+  if address then return address end
   local key = "unique." .. t.name
   if not unique[t.name] then
     unique[t.name] = true
@@ -86,17 +80,51 @@ local function spawn_unique(t)
   end
 end
 
-local function quit()
-  if next(anonymous_services) ~= nil then
-    return
+local function del_service(address)
+  if anonymous_services[address] then
+    anonymous_services[address] = nil
+  else
+    for _, name in ipairs[named_services] do
+      if named_services[name] == address then break end
+    end
   end
-  -- TODO: ltask.send
+  local msg = root.close_service(address)
+  ltask.post_message(SERVICE_SYSTEM, address, MESSAGE_SCHEDULE_DEL)
+  if msg then
+    local err = "Service " .. address .. " has benn quit."
+    for i = 1, #msg, 2 do
+      local addr = msg[i]
+      local session = msg[i + 1]
+      ltask.raise_error(addr, session, err)
+    end
+  end
 end
 
-function S.spawn_service(t)
-  if t.unique then
-    return spawn_unique(t)
+function S.quit_ltask()
+  ltask.signal_handler(del_service)
+  for i = #named_services, 1, -1 do
+    local name = named_services[i]
+    local address = named_services[name]
+    local ok, err = pcall(ltask.syscall, address, "quit")
+    if not ok then print(string.format("named service %s(%d) quit error: %s.", name, address, err)) end
   end
+  root_quit()
+end
+
+local function quit()
+  if next(anonymous_services) ~= nil then return end
+  ltask.send(ltask.self(), "quit_ltask")
+end
+
+local function signal_handler(from)
+  del_service(from)
+  quit()
+end
+
+ltask.signal_handler(signal_handler)
+
+function S.spawn_service(t)
+  if t.unique then return spawn_unique(t) end
   return spawn(t)
 end
 

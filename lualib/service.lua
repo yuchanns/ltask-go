@@ -251,9 +251,7 @@ local function post_response_message(addr, session, type, msg, sz)
   end
 end
 
-function ltask.send(address, ...)
-  post_request_message(address, SESSION_SEND_MESSAGE, MESSAGE_RESPONSE, ltask.pack(...))
-end
+function ltask.send(address, ...) post_request_message(address, SESSION_SEND_MESSAGE, MESSAGE_REQUEST, ltask.pack(...)) end
 
 function ltask.syscall(address, ...)
   post_request_message(address, session_id, MESSAGE_SYSTEM, ltask.pack(...))
@@ -354,6 +352,18 @@ function ltask.dispatch(handler)
   return service
 end
 
+local function register_handler(msg_type, f)
+  SESSION[msg_type] = function(type)
+    local from = session_coroutine_address[running_thread]
+    local session = session_coroutine_response[running_thread]
+    f(from, session)
+  end
+end
+
+function ltask.signal_handler(f) register_handler(MESSAGE_SIGNAL, f) end
+
+function ltask.idle_handler(f) register_handler(MESSAGE_IDLE, f) end
+
 local yieldable_require
 do
   local require = _G.require
@@ -438,6 +448,21 @@ local function system(command, ...)
 end
 
 SESSION[MESSAGE_SYSTEM] = function(type, msg, sz) system(ltask.unpack_remove(msg, sz)) end
+
+local function request(command, ...)
+  if service == nil then
+    error("Service is not initialized")
+    return
+  end
+  local s = service[command]
+  if not s then
+    error("Unknown request command: " .. command)
+    return
+  end
+  send_response(s(...))
+end
+
+SESSION[MESSAGE_REQUEST] = function(type, msg, sz) request(ltask.unpack_remove(msg, sz)) end
 
 function ltask.post_message(addr, session, type, msg, sz)
   ltask.send_message(addr, session, type, msg, sz)
@@ -540,7 +565,6 @@ local function schedule_message()
     return
   else
     local co = session_coroutine_suspend_lookup[session]
-    quit = true -- FIXME: quit for now
     if co == nil then
       print("Unknown response session: ", session, "from", from, "type", type, ltask.unpack_remove(msg, sz))
     else
