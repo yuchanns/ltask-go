@@ -326,21 +326,21 @@ func ltaskBootstrapOpen(L *lua.State) int {
 		return L.Errorf("ltask.bootstrap can only require once")
 	}
 	l := []*lua.Reg{
-		{"lualib", ltaskLualib},
-		{"init", ltaskInit},
-		{"deinit", ltaskDeinit},
-		{"run", ltaskRun},
-		{"wait", ltaskWait},
-		{"post_message", lpostMessage},
-		{"new_service", ltaskNewService},
-		{"init_timer", ltaskInitTimer},
-		{"init_root", ltaskInitRoot},
-		{"pushlog", ltaskBootPushLog},
+		{Name: "lualib", Func: ltaskLualib},
+		{Name: "init", Func: ltaskInit},
+		{Name: "deinit", Func: ltaskDeinit},
+		{Name: "run", Func: ltaskRun},
+		{Name: "wait", Func: ltaskWait},
+		{Name: "post_message", Func: lpostMessage},
+		{Name: "new_service", Func: ltaskNewService},
+		{Name: "init_timer", Func: ltaskInitTimer},
+		{Name: "init_root", Func: ltaskInitRoot},
+		{Name: "pushlog", Func: ltaskBootPushLog},
 		// We don't need `init_socket` here, as it is proceed by Go runtime automatically.
-		{"pack", LuaSerdePack},
-		{"unpack", LuaSerdeUnpack},
-		{"remove", LuaSerdeRemove},
-		{"unpack_remove", LuaSerdeUnpackRemove},
+		{Name: "pack", Func: LuaSerdePack},
+		{Name: "unpack", Func: LuaSerdeUnpack},
+		{Name: "remove", Func: LuaSerdeRemove},
+		{Name: "unpack_remove", Func: LuaSerdeUnpackRemove},
 	}
 
 	L.NewLib(l)

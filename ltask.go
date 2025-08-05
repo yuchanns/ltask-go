@@ -36,7 +36,7 @@ func OpenLibs(L *lua.State, lib *lua.Lib) {
 	_, _ = L.GetField(-1, "preload")
 
 	l := []*lua.Reg{
-		{"ltask.bootstrap", ltaskBootstrapOpen},
+		{Name: "ltask.bootstrap", Func: ltaskBootstrapOpen},
 	}
 	L.SetFuncs(l, 0)
 	L.Pop(2)
@@ -46,23 +46,23 @@ func OpenLibs(L *lua.State, lib *lua.Lib) {
 
 func ltaskOpen(L *lua.State) int {
 	l := []*lua.Reg{
-		{"pack", LuaSerdePack},
-		{"unpack", LuaSerdeUnpack},
-		{"remove", LuaSerdeRemove},
-		{"unpack_remove", LuaSerdeUnpackRemove},
-		{"timer_sleep", ltaskSleep},
+		{Name: "pack", Func: LuaSerdePack},
+		{Name: "unpack", Func: LuaSerdeUnpack},
+		{Name: "remove", Func: LuaSerdeRemove},
+		{Name: "unpack_remove", Func: LuaSerdeUnpackRemove},
+		{Name: "timer_sleep", Func: ltaskSleep},
 	}
 
 	L.NewLib(l)
 
 	l2 := []*lua.Reg{
-		{"send_message", lsendMessage},
-		{"recv_message", lrecvMessage},
-		{"message_receipt", lmessageReceipt},
-		{"self", lself},
-		{"label", ltaskLabel},
-		{"pushlog", ltaskPushLog},
-		{"poplog", ltaskPopLog},
+		{Name: "send_message", Func: lsendMessage},
+		{Name: "recv_message", Func: lrecvMessage},
+		{Name: "message_receipt", Func: lmessageReceipt},
+		{Name: "self", Func: lself},
+		{Name: "label", Func: ltaskLabel},
+		{Name: "pushlog", Func: ltaskPushLog},
+		{Name: "poplog", Func: ltaskPopLog},
 	}
 
 	typ, _ := L.GetField(lua.LUA_REGISTRYINDEX, "LTASK_ID")

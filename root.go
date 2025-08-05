@@ -13,7 +13,7 @@ func ltaskRootOpen(L *lua.State) int {
 		return L.Errorf("ltask.root can only require once")
 	}
 	l := []*lua.Reg{
-		{"init_service", ltaskInitService},
+		{Name: "init_service", Func: ltaskInitService},
 	}
 
 	L.NewLibTable(l)
