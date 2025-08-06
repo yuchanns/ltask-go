@@ -1,10 +1,10 @@
-local start = require("testdata.test.start")
+local start = require("testdata.start")
 
 start({
   core = {
     debuglog = "=", -- stdout
   },
-  service_path = "testdata/service/?.lua;test/?.lua",
+  service_path = "testdata/service/?.lua",
   bootstrap = {
     {
       name = "timer",
