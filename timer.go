@@ -107,13 +107,11 @@ func (t *timer) now() int64 {
 func (t *timer) init() {
 	t.assert()
 	now := time.Now()
-	sec := now.Unix()
-	nsec := now.Nanosecond()
-	csec := sec*100 + int64(nsec/10_000_000)
+	csec := now.UnixMilli() / 10
 	t.time = 0
 	t.starttime = csec / 100
 	t.current = csec % 100
-	t.currentPoint = monotime.Now()
+	t.currentPoint = uint64(time.Unix(0, int64(monotime.Now())).UnixMilli() / 10)
 	atomic.StoreInt32(&t.l, 0)
 }
 
@@ -147,7 +145,7 @@ type timerExecuteFunc func(ud *timerUpdateUd, arg *timerEvent)
 
 func (t *timer) update(fn timerExecuteFunc, ud *timerUpdateUd) {
 	t.assert()
-	cp := monotime.Now()
+	cp := uint64(time.Unix(0, int64(monotime.Now())).UnixMilli() / 10)
 	if cp < t.currentPoint {
 		fmt.Printf("timer diff error: change from %d to %d\n", cp, t.currentPoint)
 		t.currentPoint = cp
