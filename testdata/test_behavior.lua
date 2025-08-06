@@ -2,7 +2,7 @@ local start = require("testdata.start")
 
 start({
   core = {
-    -- debuglog = "=", -- stdout
+    debuglog = "=", -- stdout
   },
   service_path = "testdata/service/?.lua",
   bootstrap = {
