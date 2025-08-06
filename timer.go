@@ -60,12 +60,12 @@ func newTimer() (t *timer) {
 	ptr := malloc.Alloc(uint(unsafe.Sizeof(*t)))
 	t = (*timer)(ptr)
 
-	for i := 0; i < timeNear; i++ {
+	for i := range timeNear {
 		t.n[i].clear()
 	}
 
-	for i := 0; i < 4; i++ {
-		for j := 0; j < timeLevel; j++ {
+	for i := range 4 {
+		for j := range timeLevel {
 			t.t[i][j].clear()
 		}
 	}
@@ -154,7 +154,8 @@ func (t *timer) update(fn timerExecuteFunc, ud *timerUpdateUd) {
 	} else if cp == t.currentPoint {
 		return
 	}
-	diff := int64(cp - t.currentPoint - t.currentPoint)
+	diff := int64(cp - t.currentPoint)
+	t.currentPoint = cp
 	t.current += diff
 	for i := int64(0); i < diff; i++ {
 		t.tick(fn, ud)
@@ -265,14 +266,14 @@ func (t *timer) destroy() {
 		t.releaseLock()
 		malloc.Free(unsafe.Pointer(t))
 	}()
-	for i := 0; i < timeNear; i++ {
+	for i := range timeNear {
 		current := t.n[i].clear()
 		if current != nil {
 			t.dispatchList(current, nil, nil)
 		}
 	}
-	for i := 0; i < 4; i++ {
-		for j := 0; j < timeLevel; j++ {
+	for i := range 4 {
+		for j := range timeLevel {
 			current := t.t[i][j].clear()
 			if current != nil {
 				t.dispatchList(current, nil, nil)
