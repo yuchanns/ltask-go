@@ -387,6 +387,9 @@ func (p *servicePool) newService(sid int64) (svcId serviceId) {
 	s = (*service)(unsafe.Pointer(ptr))
 	s.receipt = messageReceiptNone
 	s.id = svcId
+	s.msg = nil
+	s.out = nil
+	s.bounce = nil
 	s.status = serviceStatusUninitialized
 	s.bindingThread = -1
 	s.cpucost = 0
