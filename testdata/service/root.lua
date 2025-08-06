@@ -185,7 +185,7 @@ local function del_service(address)
   local msg = root.close_service(address)
   ltask.post_message(SERVICE_SYSTEM, address, MESSAGE_SCHEDULE_DEL)
   if msg then
-    local err = "Service " .. address .. " has benn quit."
+    local err = "Service " .. address .. " has been quit."
     for i = 1, #msg, 2 do
       local addr = msg[i]
       local session = msg[i + 1]

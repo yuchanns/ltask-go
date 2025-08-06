@@ -338,16 +338,21 @@ func (task *ltask) dispatchOutMessages(doneJobs []serviceId) {
 			panic("Service status is not done")
 		}
 		if !p.hasMessage(id) {
-			// TODO: schedule back only if sockevent is init
-			log.Debug().Msgf("Service %d back to schedule", id)
-			p.pushMessage(id, newMessage(&message{
-				from:    serviceIdSystem,
-				to:      id,
-				session: 0,
-				typ:     messageTypeIdle,
-			}))
-			p.setStatus(id, serviceStatusSchedule)
-			task.scheduleBack(id)
+			sockId := p.getSockevent(id)
+			if sockId >= 0 {
+				log.Debug().Msgf("Service %d back to schedule", id)
+				p.pushMessage(id, newMessage(&message{
+					from:    serviceIdSystem,
+					to:      id,
+					session: 0,
+					typ:     messageTypeIdle,
+				}))
+				p.setStatus(id, serviceStatusSchedule)
+				task.scheduleBack(id)
+				continue
+			}
+			log.Debug().Msgf("Service %d is idle", id)
+			p.setStatus(id, serviceStatusIdle)
 		} else {
 			log.Debug().Msgf("Service %d back to schedule", id)
 			p.setStatus(id, serviceStatusSchedule)
@@ -582,6 +587,7 @@ func (w *workerThread) start() {
 				log.Debug().Msgf("Service %d quit", id)
 				p.setStatus(id, serviceStatusDead)
 				if id == serviceIdRoot {
+					log.Debug().Msg("Root quit")
 					// root quit, wakeup others
 					w.task.quitAllWorkers()
 					w.task.wakeupAlWorkers()

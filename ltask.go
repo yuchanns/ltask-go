@@ -60,9 +60,12 @@ func ltaskOpen(L *lua.State) int {
 		{Name: "recv_message", Func: lrecvMessage},
 		{Name: "message_receipt", Func: lmessageReceipt},
 		{Name: "self", Func: lself},
+		{Name: "timer_add", Func: ltaskTimerAdd},
+		{Name: "timer_update", Func: ltaskTimerUpdate},
 		{Name: "label", Func: ltaskLabel},
 		{Name: "pushlog", Func: ltaskPushLog},
 		{Name: "poplog", Func: ltaskPopLog},
+		{Name: "eventinit", Func: ltaskEventInit},
 	}
 
 	typ, _ := L.GetField(lua.LUA_REGISTRYINDEX, "LTASK_ID")
@@ -90,6 +93,71 @@ func ltaskSleep(L *lua.State) int {
 	csec := L.OptInteger(1, 0)
 	time.Sleep(Centisecond * time.Duration(csec))
 	return 0
+}
+
+func ltaskEventInit(L *lua.State) int {
+	s := getS(L)
+	index := s.task.services.getSockevent(s.id)
+	if index >= 0 {
+		return L.Errorf("Already init event")
+	}
+	index = int64(s.task.allocSockevent())
+	if index < 0 {
+		return L.Errorf("Too many sockevents")
+	}
+	// TODO: open sockevents
+	s.task.services.initSockevent(s.id, index)
+	return 0
+}
+
+func ltaskTimerAdd(L *lua.State) int {
+	s := getS(L)
+	t := s.task.timer
+	if s == nil {
+		return L.Errorf("Init timer before bootstrap")
+	}
+	ev := &timerEvent{
+		session: uint64(L.CheckInteger(1)),
+		id:      s.id,
+	}
+	ti := L.CheckInteger(2)
+	if ti < 0 || ti != int64(int32(ti)) {
+		return L.Errorf("Invalid timer time: %d", ti)
+	}
+	t.add(ev, int32(ti))
+	return 0
+}
+
+func timerCallback(tu *timerUpdateUd, event *timerEvent) {
+	L := tu.L
+	v := int64(event.session)
+	v = v<<32 | event.id
+	L.PushInteger(v)
+	idx := tu.n + 1
+	L.SetI(1, int64(idx))
+}
+
+func ltaskTimerUpdate(L *lua.State) int {
+	s := getS(L)
+	t := s.task.timer
+	if s == nil {
+		return L.Errorf("Init timer before bootstrap")
+	}
+	if L.GetTop() > 1 {
+		L.SetTop(1)
+		L.CheckType(1, lua.LUA_TTABLE)
+	}
+	tu := &timerUpdateUd{
+		L: L,
+		n: 0,
+	}
+	t.update(timerCallback, tu)
+	n := int64(L.RawLen(1))
+	for i := int64(tu.n + 1); i <= n; i++ {
+		L.PushNil()
+		L.SetI(1, i)
+	}
+	return 1
 }
 
 func lself(L *lua.State) int {
@@ -134,7 +202,7 @@ func ltaskPopLog(L *lua.State) int {
 type ltask struct {
 	config              *ltaskConfig
 	workers             []workerThread
-	eventInit           []atomicInt
+	eventInit           [maxSockEvent]atomicInt
 	event               []*xxchan.Channel[struct{}]
 	services            *servicePool
 	schedule            *xxchan.Channel[int]
@@ -147,6 +215,15 @@ type ltask struct {
 	threadCount         atomicInt
 	blockedService      int64
 	// TODO: logfile?
+}
+
+func (task *ltask) allocSockevent() (index int) {
+	for i := 0; i < maxSockEvent; i++ {
+		if atomic.CompareAndSwapInt64(&task.eventInit[i], 0, 1) {
+			return i
+		}
+	}
+	return -1
 }
 
 func (task *ltask) pushLog(id serviceId, data unsafe.Pointer, sz int64) (ok bool) {
@@ -199,8 +276,9 @@ func (task *ltask) init(L *lua.State, config *ltaskConfig) {
 	atomic.StoreInt64(&task.threadCount, 0)
 
 	event := make([]*xxchan.Channel[struct{}], maxSockEvent)
-	eventInit := make([]atomicInt, maxSockEvent)
-	task.eventInit = eventInit
+	for i := range task.eventInit {
+		task.eventInit[i] = 0
+	}
 	for i := range event {
 		ptr := malloc.Alloc(uint(xxchan.Sizeof[struct{}](1)))
 		ch := xxchan.Make[struct{}](ptr, 1)

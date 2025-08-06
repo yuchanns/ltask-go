@@ -14,6 +14,7 @@ func ltaskRootOpen(L *lua.State) int {
 	}
 	l := []*lua.Reg{
 		{Name: "init_service", Func: ltaskInitService},
+		{Name: "close_service", Func: ltaskCloseService},
 	}
 
 	L.NewLibTable(l)
@@ -46,4 +47,16 @@ func ltaskInitService(L *lua.State) int {
 
 	L.PushBoolean(true)
 	return 1
+}
+
+func ltaskCloseService(L *lua.State) int {
+	s := getS(L)
+	id := L.CheckInteger(1)
+	if s.task.services.getStatus(id) != serviceStatusDead {
+		return L.Errorf("Hang %d before close it", id)
+	}
+	// TODO: close sock event
+	ret := s.task.services.closeServiceMessages(L, id)
+	s.task.services.deleteService(id)
+	return ret
 }

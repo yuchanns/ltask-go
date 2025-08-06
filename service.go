@@ -3,6 +3,7 @@ package ltask
 import (
 	"bytes"
 	"fmt"
+	"slices"
 	"time"
 	"unsafe"
 
@@ -45,6 +46,7 @@ type service struct {
 	status        int64
 	receipt       int64
 	bindingThread int64
+	sockeventId   int64
 	id            serviceId
 	label         [32]byte
 	stat          memoryStat
@@ -175,6 +177,23 @@ func (task *ltask) scheduleBack(id serviceId) {
 	if !task.schedule.Push(int(id)) {
 		panic("schedule channel is full")
 	}
+}
+
+func (p *servicePool) initSockevent(id serviceId, index int64) {
+	s := p.getService(id)
+	if s == nil {
+		return
+	}
+	s.sockeventId = index
+}
+
+func (p *servicePool) getSockevent(id serviceId) (sockeventId int64) {
+	s := p.getService(id)
+	if s == nil {
+		return
+	}
+	sockeventId = s.sockeventId
+	return
 }
 
 func (p *servicePool) sendSignal(id serviceId) {
@@ -372,6 +391,7 @@ func (p *servicePool) newService(sid int64) (svcId serviceId) {
 	s.bindingThread = -1
 	s.cpucost = 0
 	s.clock = 0
+	s.sockeventId = -1
 	p.setService(s)
 	return
 }
@@ -438,6 +458,31 @@ func errorMessage(fromL, toL *lua.State, msg string) {
 		toL.Pop(1)
 	}
 	toL.PushLightUserData(unsafe.Pointer(&msg))
+}
+
+func (p *servicePool) closeServiceMessages(L *lua.State, id serviceId) (reportError int) {
+	var index int
+	for {
+		m := p.popMessage(id)
+		if m == nil {
+			break
+		}
+		if slices.Contains([]int{messageTypeRequest, messageTypeSystem}, m.typ) {
+			if reportError == 0 {
+				L.NewTable()
+				reportError = 1
+				index = 1
+			}
+			L.PushInteger(m.from)
+			L.RawSetI(-2, int64(index))
+			index++
+			L.PushInteger(int64(m.session))
+			L.RawSetI(-2, int64(index))
+			index++
+		}
+		m.delete()
+	}
+	return
 }
 
 func (p *servicePool) deleteService(id serviceId) {

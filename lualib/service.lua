@@ -264,7 +264,15 @@ function ltask.syscall(address, ...)
 end
 
 function ltask.sleep(ti)
-  -- TODO: timer
+  session_coroutine_suspend_lookup[session_id] = running_thread
+  if ti == 0 then
+    if RECEIPT_DONE ~= ltask.post_message(CURRENT_SERVICE, session_id, MESSAGE_RESPONSE) then
+      ltask.timer_add(session_id, 0)
+    end
+  else
+    ltask.timer_add(session_id, ti)
+  end
+  session_id = session_id + 1
   yield_session()
 end
 
@@ -576,6 +584,19 @@ local function new_thread(f)
   return co
 end
 
+function ltask.timeout(ti, func)
+  local co = new_thread(func)
+  session_coroutine_suspend_lookup[session_id] = co
+  if ti == 0 then
+    if RECEIPT_DONE ~= ltask.post_message(CURRENT_SERVICE, session_id, MESSAGE_RESPONSE) then
+      ltask.timer_add(session_id, 0)
+    end
+  else
+    ltask.timer_add(session_id, ti)
+  end
+  session_id = session_id + 1
+end
+
 function ltask.fork(func, ...)
   local co = new_thread(func)
   wakeup_queue[#wakeup_queue + 1] = { co, ... }
@@ -643,6 +664,7 @@ function ltask.parallel(task)
     resp(t, xpcall(t[1], error_handler, table.unpack(t, 2)))
     next_task()
   end
+
   ltask.fork(next_task)
   return function()
     if ret_tail == n and ret_head == ret_tail then return end
