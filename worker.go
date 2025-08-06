@@ -338,9 +338,16 @@ func (task *ltask) dispatchOutMessages(doneJobs []serviceId) {
 			panic("Service status is not done")
 		}
 		if !p.hasMessage(id) {
-			// TODO: schedule back for sockevent
-			log.Debug().Msgf("Service %d is idle", id)
-			p.setStatus(id, serviceStatusIdle)
+			// TODO: schedule back only if sockevent is init
+			log.Debug().Msgf("Service %d back to schedule", id)
+			p.pushMessage(id, newMessage(&message{
+				from:    serviceIdSystem,
+				to:      id,
+				session: 0,
+				typ:     messageTypeIdle,
+			}))
+			p.setStatus(id, serviceStatusSchedule)
+			task.scheduleBack(id)
 		} else {
 			log.Debug().Msgf("Service %d back to schedule", id)
 			p.setStatus(id, serviceStatusSchedule)

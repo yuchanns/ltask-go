@@ -87,8 +87,8 @@ func getS(L *lua.State) *serviceUd {
 }
 
 func ltaskSleep(L *lua.State) int {
-	sec := L.OptInteger(1, 0)
-	time.Sleep(time.Millisecond * time.Duration(sec))
+	csec := L.OptInteger(1, 0)
+	time.Sleep(Centisecond * time.Duration(csec))
 	return 0
 }
 

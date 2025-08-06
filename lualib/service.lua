@@ -265,6 +265,7 @@ end
 
 function ltask.sleep(ti)
   -- TODO: timer
+  yield_session()
 end
 
 local function wait_interrupt(errobj) rethrow_error(3, errobj) end

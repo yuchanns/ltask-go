@@ -4,6 +4,9 @@ local timer = {}
 
 function timer.quit() ltask.quit() end
 
-print("service timer started...")
+ltask.idle_handler(function()
+  print("Idle handler called")
+  ltask.timer_sleep(10)
+end)
 
 return timer

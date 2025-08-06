@@ -5,6 +5,10 @@ import (
 	"unsafe"
 )
 
+const (
+	Centisecond = time.Millisecond * 10
+)
+
 type timer struct {
 	starttime    int64
 	current      int64
