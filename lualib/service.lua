@@ -285,6 +285,18 @@ function ltask.wait(token)
   return wait_response(yield_session())
 end
 
+function ltask.multi_wait(token)
+  token = token or running_thread
+  local thr = session_waiting[token]
+  if thr then
+    thr[#thr + 1] = running_thread
+  else
+    session_waiting[token] = { running_thread }
+  end
+  session_id = session_id + 1
+  return wait_response(yield_session())
+end
+
 function ltask.wakeup(token, ...)
   local co = session_waiting[token]
   if co then
@@ -335,6 +347,19 @@ local function send_response(...)
 end
 
 function ltask.suspend(session, func) session_coroutine_suspend_lookup[session] = coroutine_create(func) end
+
+function ltask.call(address, ...)
+  post_request_message(address, session_id, MESSAGE_REQUEST, ltask.pack(...))
+  session_coroutine_suspend_lookup[session_id] = running_thread
+  session_id = session_id + 1
+  local type, session, msg, sz = yield_session()
+  if type == MESSAGE_RESPONSE then
+    return ltask.unpack_remove(msg, sz)
+  else
+    -- type == MESSAGE_ERROR
+    rethrow_error(2, ltask.unpack_remove(msg, sz))
+  end
+end
 
 local service = nil
 local sys_service = {}
@@ -441,6 +466,28 @@ function sys_service.init(t)
   rethrow_error(1, errobj)
 end
 
+function sys_service.quit()
+  if service and service.quit then
+    return service.quit()
+  else
+    ltask.quit()
+  end
+end
+
+function sys_service.memory() return collectgarbage("count") * 1024 end
+
+function sys_service.traceback()
+  local tlog = {}
+  local n = 1
+  for session, co in pairs(session_coroutine_suspend_lookup) do
+    tlog[n] = "Session : " .. tostring(session)
+    n = n + 1
+    tlog[n] = debug.traceback(co)
+    n = n + 1
+  end
+  return table.concat(tlog, "\n")
+end
+
 local function system(command, ...)
   local s = sys_service[command]
   if not s then error("Unknown system command: " .. command) end
@@ -532,6 +579,81 @@ function ltask.fork(func, ...)
   local co = new_thread(func)
   wakeup_queue[#wakeup_queue + 1] = { co, ... }
   return co
+end
+
+function ltask.current_session()
+  local from = session_coroutine_address[running_thread]
+  local session = session_coroutine_response[running_thread]
+  return { from = from, session = session }
+end
+
+function ltask.spawn(name, ...) return ltask.call(SERVICE_ROOT, "spawn", name, ...) end
+
+function ltask.queryservice(name) return ltask.call(SERVICE_ROOT, "queryservice", name) end
+
+function ltask.uniqueservice(name, ...) return ltask.call(SERVICE_ROOT, "uniqueservice", name, ...) end
+
+function ltask.spawn_service(name, ...) return ltask.call(SERVICE_ROOT, "spawn_service", name, ...) end
+
+function ltask.parallel(task)
+  local n = #task
+  if n == 0 then
+    return function() end
+  end
+  local ret_head = 0
+  local ret_tail = 0
+  local ret = {}
+  local token
+  local function rethrow(res) rethrow_error(2, res.error) end
+  local function resp(t, ok, ...)
+    local res = {}
+    if ok then
+      res = table.pack(...)
+    else
+      res.error = ...
+      res.rethrow = rethrow
+    end
+    ret_tail = ret_tail + 1
+    ret[ret_tail] = { t, res }
+    if token then
+      ltask.wakeup(token)
+      token = nil
+    end
+  end
+  local idx = 1
+  local supervisor_running = false
+  local run_task -- function
+  local function next_task()
+    local i = idx
+    idx = idx + 1
+    local t = task[i]
+    if t then run_task(t) end
+  end
+  local function run_supervisor()
+    supervisor_running = false -- only one supervisor
+    next_task()
+  end
+  local function error_handler(errobj) return traceback(errobj, 4) end
+  function run_task(t)
+    if not supervisor_running then
+      supervisor_running = true
+      ltask.fork(run_supervisor)
+    end
+    resp(t, xpcall(t[1], error_handler, table.unpack(t, 2)))
+    next_task()
+  end
+  ltask.fork(next_task)
+  return function()
+    if ret_tail == n and ret_head == ret_tail then return end
+    while ret_head == ret_tail do
+      token = {}
+      ltask.wait(token)
+    end
+    ret_head = ret_head + 1
+    local t = ret[ret_head]
+    ret[ret_head] = nil
+    return t[1], t[2]
+  end
 end
 
 local function new_session(f, from, session)

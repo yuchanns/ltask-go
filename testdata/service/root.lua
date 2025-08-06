@@ -48,12 +48,95 @@ do
   ltask.suspend(1, init_receipt)
 end
 
+local retry_queue
+
+local function send_retry_queue(addr, queue)
+  local n = #queue
+  for i = 1, n do
+    local type = ltask.post_message(addr, table.unpack(queue[i]))
+    if type == RECEIPT_BLOCK then
+      table.move(queue, i, n, 1)
+      return true
+    elseif type == RECEIPT_ERROR then
+      for j = i, n do
+        local msg, sz = queue[j][3], queue[j][4]
+        ltask.remove(msg, sz)
+      end
+      return
+    end
+  end
+end
+
+local function send_all_retry()
+  while true do
+    local removed = {}
+    for addr, queue in pairs(retry_queue) do
+      if not send_retry_queue(addr, queue) then removed[addr] = true end
+    end
+    for addr in pairs(removed) do
+      retry_queue[addr] = nil
+    end
+    if next(retry_queue) == nil then break end
+    ltask.sleep(1)
+  end
+  retry_queue = nil
+end
+
+function S.send_retry(addr, session, type, ...)
+  local message = { session, type, ltask.pack(...) }
+  if retry_queue then
+    local q = retry_queue[addr]
+    if q then
+      q[#q + 1] = message
+    else
+      retry_queue[addr] = { message }
+    end
+  else
+    retry_queue = {
+      [addr] = { message },
+    }
+    ltask.fork(send_all_retry)
+  end
+end
+
 local function register_service(address, name)
   if named_services[name] then error(("Name `%s` already exists."):format(name)) end
   anonymous_services[address] = nil
   named_services[#named_services + 1] = name
   named_services[name] = address
   ltask.multi_wakeup("unique." .. name, address)
+end
+
+function S.tracelog(timeout)
+  local tlog = {}
+  local tasks = {}
+  local n = 1
+  for addr in pairs(anonymous_services) do
+    tasks[n] = { ltask.syscall, addr, "traceback", addr = addr }
+    n = n + 1
+    tlog[addr] = {}
+  end
+  for _, name in ipairs(named_services) do
+    local addr = named_services[name]
+    tasks[n] = { ltask.syscall, addr, "traceback", addr = addr, name = name }
+    n = n + 1
+    tlog[addr] = { name = name }
+  end
+  if timeout then tasks[n] = { ltask.sleep, timeout } end
+
+  for req, resp in ltask.parallel(tasks) do
+    if not req.addr then
+      -- timeout
+      break
+    end
+    if not resp.error then
+      tlog[req.addr].traceback = resp[1]
+    else
+      tlog[req.addr].error = resp.error
+    end
+  end
+
+  return tlog
 end
 
 local function spawn(t)
@@ -134,6 +217,26 @@ local function signal_handler(from)
 end
 
 ltask.signal_handler(signal_handler)
+
+function S.spawn(name, ...)
+  return spawn({
+    name = name,
+    args = { ... },
+  })
+end
+
+function S.queryservice(name)
+  local address = named_services[name]
+  if address then return address end
+  return ltask.multi_wait("unique." .. name)
+end
+
+function S.uniqueservice(name, ...)
+  return spawn_unique({
+    name = name,
+    args = { ... },
+  })
+end
 
 function S.spawn_service(t)
   if t.unique then return spawn_unique(t) end
