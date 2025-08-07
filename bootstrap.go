@@ -78,12 +78,22 @@ func ltaskBootPushLog(L *lua.State) int {
 	return 0
 }
 
+type timerEvent struct {
+	session session
+	id      serviceId
+}
+
+type timerUpdateUd struct {
+	L *lua.State
+	n int
+}
+
 func ltaskInitTimer(L *lua.State) int {
 	task := getPtr[ltask](L, "LTASK_GLOBAL")
 	if task.timer != nil {
 		return L.Errorf("Timer can init only once")
 	}
-	task.timer = newTimer()
+	task.timer = newTimer[timerEvent, timerUpdateUd]()
 
 	return 0
 }

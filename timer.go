@@ -9,7 +9,6 @@ import (
 
 	"github.com/aristanetworks/goarista/monotime"
 	"github.com/phuslu/log"
-	"go.yuchanns.xyz/lua"
 )
 
 const (
@@ -23,33 +22,33 @@ const (
 	timeLevelMask  = timeLevel - 1
 )
 
-type timerNode struct {
-	next   *timerNode
+type timerNode[T any] struct {
+	next   *timerNode[T]
 	expire int32
-	event  timerEvent
+	event  T
 }
 
-type linkList struct {
-	head timerNode
-	tail *timerNode
+type linkList[T any] struct {
+	head timerNode[T]
+	tail *timerNode[T]
 }
 
-func (l *linkList) link(node *timerNode) {
+func (l *linkList[T]) link(node *timerNode[T]) {
 	l.tail.next = node
 	l.tail = node
 	node.next = nil
 }
 
-func (l *linkList) clear() (ret *timerNode) {
+func (l *linkList[T]) clear() (ret *timerNode[T]) {
 	ret = l.head.next
 	l.head.next = nil
 	l.tail = &l.head
 	return
 }
 
-type timer struct {
-	n            [timeNear]linkList
-	t            [4][timeLevel]linkList
+type timer[T any, E any] struct {
+	n            [timeNear]linkList[T]
+	t            [4][timeLevel]linkList[T]
 	l            int32
 	time         uint32
 	starttime    int64
@@ -57,9 +56,9 @@ type timer struct {
 	currentPoint uint64
 }
 
-func newTimer() (t *timer) {
+func newTimer[T any, E any]() (t *timer[T, E]) {
 	ptr := malloc.Alloc(uint(unsafe.Sizeof(*t)))
-	t = (*timer)(ptr)
+	t = (*timer[T, E])(ptr)
 
 	for i := range timeNear {
 		t.n[i].clear()
@@ -76,13 +75,13 @@ func newTimer() (t *timer) {
 	return t
 }
 
-func (t *timer) assert() {
+func (t *timer[T, E]) assert() {
 	if t == nil {
 		panic("timer is nil")
 	}
 }
 
-func (t *timer) acquireLock() {
+func (t *timer[T, E]) acquireLock() {
 	t.assert()
 	for !atomic.CompareAndSwapInt32(&t.l, 0, 1) {
 		log.Debug().Msgf("timer acquireLock failed, waiting...%d", t.l)
@@ -90,22 +89,22 @@ func (t *timer) acquireLock() {
 	}
 }
 
-func (t *timer) releaseLock() {
+func (t *timer[T, E]) releaseLock() {
 	t.assert()
 	atomic.StoreInt32(&t.l, 0)
 }
 
-func (t *timer) start() int64 {
+func (t *timer[T, E]) start() int64 {
 	t.assert()
 	return t.starttime
 }
 
-func (t *timer) now() int64 {
+func (t *timer[T, E]) now() int64 {
 	t.assert()
 	return t.current
 }
 
-func (t *timer) init() {
+func (t *timer[T, E]) init() {
 	t.assert()
 	now := time.Now()
 	csec := now.UnixMilli() / 10
@@ -116,32 +115,22 @@ func (t *timer) init() {
 	atomic.StoreInt32(&t.l, 0)
 }
 
-func (t *timer) add(event *timerEvent, time int32) {
+func (t *timer[T, E]) add(event *T, time int32) {
 	t.acquireLock()
 	defer t.releaseLock()
 
-	var node *timerNode
+	var node *timerNode[T]
 	ptr := malloc.Alloc(uint(unsafe.Sizeof(*node)))
-	node = (*timerNode)(ptr)
+	node = (*timerNode[T])(ptr)
 	node.next = nil
 	node.event = *event
 	node.expire = time + int32(t.time)
 	t.addNode(node)
 }
 
-type timerEvent struct {
-	session session
-	id      serviceId
-}
+type timerExecuteFunc[T any] func(arg *T)
 
-type timerUpdateUd struct {
-	L *lua.State
-	n int
-}
-
-type timerExecuteFunc func(ud *timerUpdateUd, arg *timerEvent)
-
-func (t *timer) update(fn timerExecuteFunc, ud *timerUpdateUd) {
+func (t *timer[T, E]) update(fn timerExecuteFunc[T], ud *E) {
 	t.assert()
 	cp := uint64(time.Unix(0, int64(monotime.Now())).UnixMilli() / 10)
 	if cp < t.currentPoint {
@@ -158,7 +147,7 @@ func (t *timer) update(fn timerExecuteFunc, ud *timerUpdateUd) {
 	}
 }
 
-func (t *timer) tick(fn timerExecuteFunc, ud *timerUpdateUd) {
+func (t *timer[T, E]) tick(fn timerExecuteFunc[T], ud *E) {
 	t.acquireLock()
 	defer t.releaseLock()
 
@@ -171,10 +160,10 @@ func (t *timer) tick(fn timerExecuteFunc, ud *timerUpdateUd) {
 	t.execute(fn, ud)
 }
 
-func (t *timer) dispatchList(current *timerNode, fn timerExecuteFunc, ud *timerUpdateUd) {
+func (t *timer[T, E]) dispatchList(current *timerNode[T], fn timerExecuteFunc[T], ud *E) {
 	for {
 		if fn != nil && ud != nil {
-			fn(ud, &current.event)
+			fn(&current.event)
 		}
 		temp := current
 		current = current.next
@@ -185,7 +174,7 @@ func (t *timer) dispatchList(current *timerNode, fn timerExecuteFunc, ud *timerU
 	}
 }
 
-func (t *timer) execute(fn timerExecuteFunc, ud *timerUpdateUd) {
+func (t *timer[T, E]) execute(fn timerExecuteFunc[T], ud *E) {
 	t.assert()
 	idx := t.time & timeNearMask
 
@@ -198,7 +187,7 @@ func (t *timer) execute(fn timerExecuteFunc, ud *timerUpdateUd) {
 	}
 }
 
-func (t *timer) shift() {
+func (t *timer[T, E]) shift() {
 	t.assert()
 	mask := uint32(timeNear)
 	t.time++
@@ -221,7 +210,7 @@ func (t *timer) shift() {
 	}
 }
 
-func (t *timer) moveList(level int, idx int) {
+func (t *timer[T, E]) moveList(level int, idx int) {
 	t.assert()
 
 	current := t.t[level][idx].clear()
@@ -232,7 +221,7 @@ func (t *timer) moveList(level int, idx int) {
 	}
 }
 
-func (t *timer) addNode(node *timerNode) {
+func (t *timer[T, E]) addNode(node *timerNode[T]) {
 	t.assert()
 
 	time := node.expire
@@ -253,7 +242,7 @@ func (t *timer) addNode(node *timerNode) {
 	t.t[i][(time>>(timeNearShift+i*timeLevelShift))&timeLevelMask].link(node)
 }
 
-func (t *timer) destroy() {
+func (t *timer[T, E]) destroy() {
 	if t == nil {
 		return
 	}

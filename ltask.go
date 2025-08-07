@@ -152,7 +152,9 @@ func ltaskTimerUpdate(L *lua.State) int {
 		L: L,
 		n: 0,
 	}
-	t.update(timerCallback, tu)
+	t.update(func(event *timerEvent) {
+		timerCallback(tu, event)
+	}, tu)
 	n := int64(L.RawLen(1))
 	for i := int64(tu.n + 1); i <= n; i++ {
 		L.PushNil()
@@ -207,7 +209,7 @@ type ltask struct {
 	event               [maxSockEvent]*xxchan.Channel[struct{}]
 	services            *servicePool
 	schedule            *xxchan.Channel[int]
-	timer               *timer
+	timer               *timer[timerEvent, timerUpdateUd]
 	lqueue              *logQueue
 	externalMessage     *xxchan.Channel[unsafe.Pointer]
 	externalLastMessage *message
