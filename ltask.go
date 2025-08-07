@@ -128,16 +128,6 @@ func ltaskTimerAdd(L *lua.State) int {
 	return 0
 }
 
-func timerCallback(tu *timerUpdateUd, event *timerEvent) {
-	L := tu.L
-	v := int64(event.session)
-	v = v<<32 | event.id
-	L.PushInteger(v)
-	tu.n++
-	idx := tu.n
-	L.SetI(1, int64(idx))
-}
-
 func ltaskTimerUpdate(L *lua.State) int {
 	s := getS(L)
 	t := s.task.timer
@@ -153,8 +143,14 @@ func ltaskTimerUpdate(L *lua.State) int {
 		n: 0,
 	}
 	t.update(func(event *timerEvent) {
-		timerCallback(tu, event)
-	}, tu)
+		L := tu.L
+		v := int64(event.session)
+		v = v<<32 | event.id
+		L.PushInteger(v)
+		tu.n++
+		idx := tu.n
+		L.SetI(1, int64(idx))
+	})
 	n := int64(L.RawLen(1))
 	for i := int64(tu.n + 1); i <= n; i++ {
 		L.PushNil()
@@ -209,7 +205,7 @@ type ltask struct {
 	event               [maxSockEvent]*xxchan.Channel[struct{}]
 	services            *servicePool
 	schedule            *xxchan.Channel[int]
-	timer               *timer[timerEvent, timerUpdateUd]
+	timer               *timer[timerEvent]
 	lqueue              *logQueue
 	externalMessage     *xxchan.Channel[unsafe.Pointer]
 	externalLastMessage *message

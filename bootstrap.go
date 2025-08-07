@@ -93,7 +93,7 @@ func ltaskInitTimer(L *lua.State) int {
 	if task.timer != nil {
 		return L.Errorf("Timer can init only once")
 	}
-	task.timer = newTimer[timerEvent, timerUpdateUd]()
+	task.timer = newTimer[timerEvent]()
 
 	return 0
 }
