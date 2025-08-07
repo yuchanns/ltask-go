@@ -51,16 +51,16 @@ func (config *ltaskConfig) load(L *lua.State, index int) {
 	config.queueSending = int64(alignPow2(uint(configGetInit(L, index, "queue_sending", defaultQueueSending))))
 	config.maxService = int64(alignPow2(uint(configGetInit(L, index, "max_service", defaultMaxService))))
 	config.externalQueue = configGetInit(L, index, "external_queue", 0)
-	typ, _ := L.GetField(index, "crash_log")
-	if typ == lua.LUA_TSTRING {
-		var size int
-		log := L.ToLString(-1, &size)
-		if size < 128 {
-			crashLog := make([]byte, size+1)
-			copy(crashLog, []byte(log))
-			config.crashLog = crashLog
-		}
-	}
+	// typ, _ := L.GetField(index, "crash_log")
+	// if typ == lua.LUA_TSTRING {
+	// 	var size int
+	// 	log := L.ToLString(-1, &size)
+	// 	if size < 128 {
+	// 		crashLog := make([]byte, size+1)
+	// 		copy(crashLog, []byte(log))
+	// 		config.crashLog = crashLog
+	// 	}
+	// }
 
 	L.PushInteger(int64(config.worker))
 	L.SetField(index, "worker")
