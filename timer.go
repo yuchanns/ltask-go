@@ -26,6 +26,7 @@ const (
 type timerNode struct {
 	next   *timerNode
 	expire int32
+	event  timerEvent
 }
 
 type linkList struct {
@@ -115,18 +116,15 @@ func (t *timer) init() {
 	atomic.StoreInt32(&t.l, 0)
 }
 
-func (t *timer) add(arg *timerEvent, time int32) {
+func (t *timer) add(event *timerEvent, time int32) {
 	t.acquireLock()
 	defer t.releaseLock()
 
 	var node *timerNode
-	nodeSz := unsafe.Sizeof(*node)
-	evtSz := unsafe.Sizeof(*arg)
-	ptr := malloc.Alloc(uint(nodeSz + evtSz))
+	ptr := malloc.Alloc(uint(unsafe.Sizeof(*node)))
 	node = (*timerNode)(ptr)
 	node.next = nil
-	evt := (*timerEvent)(unsafe.Pointer(uintptr(ptr) + nodeSz))
-	*evt = *arg
+	node.event = *event
 	node.expire = time + int32(t.time)
 	t.addNode(node)
 }
@@ -176,8 +174,7 @@ func (t *timer) tick(fn timerExecuteFunc, ud *timerUpdateUd) {
 func (t *timer) dispatchList(current *timerNode, fn timerExecuteFunc, ud *timerUpdateUd) {
 	for {
 		if fn != nil && ud != nil {
-			evt := (*timerEvent)(unsafe.Pointer(uintptr(unsafe.Pointer(current)) + unsafe.Sizeof(*current)))
-			fn(ud, evt)
+			fn(ud, &current.event)
 		}
 		temp := current
 		current = current.next
