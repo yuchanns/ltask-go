@@ -130,10 +130,10 @@ func ltaskTimerAdd(L *lua.State) int {
 
 func ltaskTimerUpdate(L *lua.State) int {
 	s := getS(L)
-	t := s.task.timer
 	if s == nil {
 		return L.Errorf("Init timer before bootstrap")
 	}
+	t := s.task.timer
 	if L.GetTop() > 1 {
 		L.SetTop(1)
 		L.CheckType(1, lua.LUA_TTABLE)
