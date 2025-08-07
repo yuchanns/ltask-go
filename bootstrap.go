@@ -30,7 +30,7 @@ func getPtr[T any](L *lua.State, key string) *T {
 //go:embed lualib
 var lualib embed.FS
 
-func ltaskLualib(L *lua.State) int {
+func ltaskBuiltin(L *lua.State) int {
 	fileName := L.CheckString(1)
 	scode, err := lualib.ReadFile(fmt.Sprintf("lualib/%s.lua", fileName))
 	if err != nil {
@@ -336,7 +336,7 @@ func ltaskBootstrapOpen(L *lua.State) int {
 		return L.Errorf("ltask.bootstrap can only require once")
 	}
 	l := []*lua.Reg{
-		{Name: "lualib", Func: ltaskLualib},
+		{Name: "builtin", Func: ltaskBuiltin},
 		{Name: "init", Func: ltaskInit},
 		{Name: "deinit", Func: ltaskDeinit},
 		{Name: "run", Func: ltaskRun},

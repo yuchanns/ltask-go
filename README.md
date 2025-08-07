@@ -23,7 +23,7 @@ When using ltask, you can load the embedded Lua modules via `ltask.bootstrap`. F
 
 ```lua
 local boot = require("ltask.bootstrap")
-local bootstrap = load(boot.lualib("bootstrap"))()
+local bootstrap = load(boot.builtin("bootstrap"))()
 -- now you can use the bootstrap to start ltask.
 local ctx = bootstrap.start({})
 bootstrap.wait(ctx)

@@ -13,7 +13,7 @@ end
 return function(config)
   local root_config = {
     bootstrap = config.bootstrap,
-    service_source = boot.lualib("service"),
+    service_source = boot.builtin("service"),
     service_chunkname = "@lualib/service.lua",
     initfunc = ([=[
 local name = ...
@@ -30,7 +30,7 @@ return loadfile(filename)
       service_path = config.service_path,
     }),
   }
-  local bootstrap = load(boot.lualib("bootstrap"))()
+  local bootstrap = load(boot.builtin("bootstrap"))()
   local ctx = bootstrap.start({
     core = config.core or {},
     root = root_config,
