@@ -117,7 +117,7 @@ func ltaskTimerAdd(L *lua.State) int {
 		return L.Errorf("Init timer before bootstrap")
 	}
 	ev := &timerEvent{
-		session: uint64(L.CheckInteger(1)),
+		session: int32(L.CheckInteger(1)),
 		id:      s.id,
 	}
 	ti := L.CheckInteger(2)
@@ -140,8 +140,8 @@ func ltaskTimerUpdate(L *lua.State) int {
 	}
 	var idx int64
 	t.update(func(event *timerEvent) {
-		v := int64(event.session)
-		v = v<<32 | event.id
+		// Pack session and id into a single int64 value
+		v := int64(event.session)<<32 | int64(event.id)
 		L.PushInteger(v)
 		idx++
 		L.SetI(1, int64(idx))
@@ -160,7 +160,7 @@ func ltaskTimerUpdate(L *lua.State) int {
 
 func lself(L *lua.State) int {
 	s := getS(L)
-	L.PushInteger(s.id)
+	L.PushInteger(int64(s.id))
 	return 1
 }
 
@@ -191,7 +191,7 @@ func ltaskPopLog(L *lua.State) int {
 	}
 	// TODO: timer_starttime
 	L.PushInteger(m.timestamp)
-	L.PushInteger(m.id)
+	L.PushInteger(int64(m.id))
 	L.PushLightUserData(m.msg)
 	L.PushInteger(m.sz)
 	return 4
@@ -217,7 +217,7 @@ type ltask struct {
 
 func (task *ltask) allocSockevent() (index int) {
 	for i := 0; i < maxSockEvent; i++ {
-		if atomic.CompareAndSwapInt64(&task.eventInit[i], 0, 1) {
+		if atomic.CompareAndSwapInt32(&task.eventInit[i], 0, 1) {
 			return i
 		}
 	}
@@ -269,15 +269,15 @@ func (task *ltask) init(L *lua.State, config *ltaskConfig) {
 		log.DefaultLogger.SetLevel(log.InfoLevel)
 	}
 
-	atomic.StoreInt64(&task.scheduleOwner, threadNone)
-	atomic.StoreInt64(&task.activeWorker, 0)
-	atomic.StoreInt64(&task.threadCount, 0)
+	atomic.StoreInt32(&task.scheduleOwner, threadNone)
+	atomic.StoreInt32(&task.activeWorker, 0)
+	atomic.StoreInt32(&task.threadCount, 0)
 
 	for i := range task.event {
 		ptr := malloc.Alloc(uint(xxchan.Sizeof[struct{}](1)))
 		ch := xxchan.Make[struct{}](ptr, 1)
 		task.event[i] = ch
-		atomic.StoreInt64(&task.eventInit[i], 0)
+		atomic.StoreInt32(&task.eventInit[i], 0)
 	}
 }
 
@@ -295,7 +295,7 @@ func (task *ltask) initWorker(L *lua.State) {
 
 	for id := range task.config.worker {
 		worker := &task.workers[id]
-		worker.init(task, id)
+		worker.init(task, serviceId(id))
 	}
 }
 

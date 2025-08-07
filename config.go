@@ -7,7 +7,7 @@ import (
 	"go.yuchanns.xyz/lua"
 )
 
-type atomicInt = int64
+type atomicInt = int32
 
 const (
 	defaultMaxService   = 65536
@@ -28,7 +28,7 @@ type ltaskConfig struct {
 	worker        int64
 	queue         int64
 	queueSending  int64
-	maxService    int64
+	maxService    int32
 	externalQueue int64
 	crashLog      []byte
 }
@@ -49,7 +49,7 @@ func (config *ltaskConfig) load(L *lua.State, index int) {
 	}
 	config.queue = int64(alignPow2(uint(configGetInit(L, index, "queue", defaultQueue))))
 	config.queueSending = int64(alignPow2(uint(configGetInit(L, index, "queue_sending", defaultQueueSending))))
-	config.maxService = int64(alignPow2(uint(configGetInit(L, index, "max_service", defaultMaxService))))
+	config.maxService = int32(alignPow2(uint(configGetInit(L, index, "max_service", defaultMaxService))))
 	config.externalQueue = configGetInit(L, index, "external_queue", 0)
 	// typ, _ := L.GetField(index, "crash_log")
 	// if typ == lua.LUA_TSTRING {

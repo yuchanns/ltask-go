@@ -37,7 +37,7 @@ func ltaskInitService(L *lua.State) int {
 	label := L.CheckString(2)
 	source := L.CheckString(3)
 	chunkName := L.CheckString(4)
-	workerId := L.OptInteger(5, -1)
+	workerId := int32(L.OptInteger(5, -1))
 
 	if !s.task.initService(L, serviceId(sid), label, source, chunkName, workerId) {
 		L.PushBoolean(false)
@@ -51,7 +51,7 @@ func ltaskInitService(L *lua.State) int {
 
 func ltaskCloseService(L *lua.State) int {
 	s := getS(L)
-	id := L.CheckInteger(1)
+	id := serviceId(L.CheckInteger(1))
 	if s.task.services.getStatus(id) != serviceStatusDead {
 		return L.Errorf("Hang %d before close it", id)
 	}

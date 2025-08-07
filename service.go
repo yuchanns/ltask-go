@@ -45,7 +45,7 @@ type service struct {
 	bounce        *message
 	status        int64
 	receipt       int64
-	bindingThread int64
+	bindingThread int32
 	sockeventId   int64
 	id            serviceId
 	label         [32]byte
@@ -94,7 +94,7 @@ func (s *service) requiref(name string, fn lua.GoFunc, pL *lua.State) (ok bool) 
 	return true
 }
 
-func (s *service) setBinding(workerThread int64) {
+func (s *service) setBinding(workerThread int32) {
 	s.bindingThread = workerThread
 }
 
@@ -142,9 +142,9 @@ func (s *service) close() {
 }
 
 type servicePool struct {
-	mask     int64
+	mask     int32
 	queueLen int64
-	id       int64
+	id       int32
 	s        []*service
 }
 
@@ -362,8 +362,8 @@ func (p *servicePool) postMessage(msg *message) (ok bool) {
 	return
 }
 
-func (p *servicePool) newService(sid int64) (svcId serviceId) {
-	var id int64
+func (p *servicePool) newService(sid serviceId) (svcId serviceId) {
+	var id serviceId
 	if sid != 0 {
 		id = sid
 		if p.getService(sid) != nil {
@@ -371,7 +371,7 @@ func (p *servicePool) newService(sid int64) (svcId serviceId) {
 		}
 	} else {
 		id = p.id
-		for i := int64(0); ; i++ {
+		for i := int32(0); ; i++ {
 			if i > p.mask {
 				return
 			}
@@ -400,7 +400,7 @@ func (p *servicePool) newService(sid int64) (svcId serviceId) {
 	return
 }
 
-func (p *servicePool) getBindingThread(id serviceId) (thread int64) {
+func (p *servicePool) getBindingThread(id serviceId) (thread int32) {
 	s := p.getService(id)
 	if s == nil {
 		return
@@ -409,7 +409,7 @@ func (p *servicePool) getBindingThread(id serviceId) (thread int64) {
 	return
 }
 
-func (p *servicePool) getService(id int64) *service {
+func (p *servicePool) getService(id int32) *service {
 	return p.s[id&p.mask]
 }
 
@@ -477,7 +477,7 @@ func (p *servicePool) closeServiceMessages(L *lua.State, id serviceId) (reportEr
 				reportError = 1
 				index = 1
 			}
-			L.PushInteger(m.from)
+			L.PushInteger(int64(m.from))
 			L.RawSetI(-2, int64(index))
 			index++
 			L.PushInteger(int64(m.session))
@@ -507,7 +507,7 @@ func requireModule(L *lua.State) int {
 }
 
 func (task *ltask) initService(L *lua.State, id serviceId, label string,
-	source string, chunkName string, workerId int64) (ok bool) {
+	source string, chunkName string, workerId int32) (ok bool) {
 	// FIXME: free memory of ud when service is delete
 	ptr := mem.Alloc(uint(unsafe.Sizeof(serviceUd{})))
 	ud := (*serviceUd)(unsafe.Pointer(ptr))

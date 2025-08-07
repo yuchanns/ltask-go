@@ -6,7 +6,7 @@ import (
 	"go.yuchanns.xyz/lua"
 )
 
-type session = uint64
+type session = int32
 
 type message struct {
 	from    serviceId
@@ -20,7 +20,7 @@ type message struct {
 func genSendMessage(L *lua.State, id serviceId) *message {
 	m := &message{
 		from:    id,
-		to:      L.CheckInteger(1),
+		to:      int32(L.CheckInteger(1)),
 		session: session(L.CheckInteger(2)),
 		typ:     int(L.CheckInteger(3)),
 	}

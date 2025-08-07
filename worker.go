@@ -13,11 +13,11 @@ import (
 
 const bindingServiceQueue = 16
 
-type serviceId = int64
+type serviceId = int32
 
 type workerThread struct {
 	task         *ltask
-	workerId     int64
+	workerId     int32
 	running      serviceId
 	binding      serviceId
 	waiting      serviceId
@@ -38,8 +38,8 @@ func (w *workerThread) init(task *ltask, id serviceId) {
 	w.running = 0
 	w.binding = 0
 	w.waiting = 0
-	atomic.StoreInt64(&w.serviceReady, 0)
-	atomic.StoreInt64(&w.serviceDone, 0)
+	atomic.StoreInt32(&w.serviceReady, 0)
+	atomic.StoreInt32(&w.serviceDone, 0)
 	w.termSignal = 0
 	w.sleeping = 0
 	w.wakeup = 0
@@ -64,7 +64,7 @@ func (w *workerThread) getJob() (id serviceId) {
 		if job == 0 {
 			break
 		}
-		atomic.CompareAndSwapInt64(&w.serviceReady, job, 0)
+		atomic.CompareAndSwapInt32(&w.serviceReady, job, 0)
 		id = serviceId(job)
 		break
 	}
@@ -72,7 +72,7 @@ func (w *workerThread) getJob() (id serviceId) {
 }
 
 func (w *workerThread) acquireScheduler() (ok bool) {
-	ok = atomic.CompareAndSwapInt64(&w.task.scheduleOwner, threadNone, w.workerId)
+	ok = atomic.CompareAndSwapInt32(&w.task.scheduleOwner, threadNone, w.workerId)
 	if ok {
 		log.Debug().Msgf("Worker %d acquired scheduler", w.workerId)
 	}
@@ -81,10 +81,10 @@ func (w *workerThread) acquireScheduler() (ok bool) {
 }
 
 func (w *workerThread) releaseScheduler() {
-	if atomic.LoadInt64(&w.task.scheduleOwner) != w.workerId {
+	if atomic.LoadInt32(&w.task.scheduleOwner) != w.workerId {
 		panic("Worker trying to release scheduler it does not own")
 	}
-	atomic.CompareAndSwapInt64(&w.task.scheduleOwner, w.workerId, threadNone)
+	atomic.CompareAndSwapInt32(&w.task.scheduleOwner, w.workerId, threadNone)
 	log.Debug().Msgf("Worker %d released scheduler", w.workerId)
 }
 
@@ -283,7 +283,7 @@ func (task *ltask) countFreeSlots() (slots int) {
 			slots++
 			continue
 		}
-		atomic.StoreInt64(&w.serviceReady, id)
+		atomic.StoreInt32(&w.serviceReady, id)
 		w.kickRunning(id)
 		w.wake()
 		log.Debug().Msgf("Worker %d is assigned service %d from binding queue", w.workerId, id)
@@ -372,7 +372,7 @@ func (task *ltask) dispatchScheduleMessage(id serviceId, msg *message) {
 	sid := msg.session
 	switch msg.typ {
 	case messageScheduleNew:
-		msg.to = p.newService(int64(sid))
+		msg.to = p.newService(sid)
 		log.Debug().Msgf("New service %d", msg.to)
 		if msg.to == 0 {
 			p.writeReceipt(id, messageReceiptError, msg)
@@ -417,7 +417,7 @@ func (w *workerThread) doneJob() (job serviceId) {
 }
 
 func (w *workerThread) completeJob() (ok bool) {
-	if atomic.CompareAndSwapInt64(&w.serviceDone, 0, w.running) {
+	if atomic.CompareAndSwapInt32(&w.serviceDone, 0, w.running) {
 		w.running = 0
 		ok = true
 	}
@@ -442,7 +442,7 @@ func (w *workerThread) schedule() (noJob bool) {
 		return
 	}
 	log.Debug().Msgf("Worker %d stealing service %d", w.workerId, job)
-	atomic.StoreInt64(&w.serviceReady, job)
+	atomic.StoreInt32(&w.serviceReady, job)
 	return
 }
 
@@ -466,7 +466,7 @@ func (w *workerThread) stolen() (id serviceId) {
 		// job is binding to the worker, can't steal
 		return
 	}
-	if atomic.CompareAndSwapInt64(&w.serviceReady, job, 0) {
+	if atomic.CompareAndSwapInt32(&w.serviceReady, job, 0) {
 		id = job
 		w.waiting = 0
 	}
@@ -532,7 +532,7 @@ func (w *workerThread) quit() {
 
 func (w *workerThread) start() {
 	p := w.task.services
-	atomic.AddInt64(&w.task.activeWorker, 1)
+	atomic.AddInt32(&w.task.activeWorker, 1)
 	log.Debug().Msgf("Worker %d start", w.workerId)
 
 	for {
@@ -560,10 +560,10 @@ func (w *workerThread) start() {
 
 			if noJob && w.task.blockedService == 0 {
 				// go to sleep if no job and no blocked service
-				atomic.AddInt64(&w.task.threadCount, -1)
+				atomic.AddInt32(&w.task.threadCount, -1)
 				log.Debug().Msgf("Worker %d sleeping", w.workerId)
 				w.sleep()
-				atomic.AddInt64(&w.task.activeWorker, 1)
+				atomic.AddInt32(&w.task.activeWorker, 1)
 				log.Debug().Msgf("Worker %d wakeup", w.workerId)
 			}
 			continue
@@ -627,7 +627,7 @@ func (w *workerThread) start() {
 		}
 	}
 	w.quit()
-	atomic.AddInt64(&w.task.threadCount, -1)
+	atomic.AddInt32(&w.task.threadCount, -1)
 	log.Debug().Msgf("Worker %d quit", w.workerId)
 
 }

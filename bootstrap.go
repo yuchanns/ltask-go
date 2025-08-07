@@ -103,8 +103,8 @@ func ltaskNewService(L *lua.State) int {
 	label := L.CheckString(1)
 	source := L.CheckString(2)
 	chunkName := L.CheckString(3)
-	sid := L.OptInteger(4, 0)
-	workerId := L.OptInteger(5, -1)
+	sid := serviceId(L.OptInteger(4, 0))
+	workerId := int32(L.OptInteger(5, -1))
 
 	id := task.services.newService(sid)
 
@@ -114,13 +114,13 @@ func ltaskNewService(L *lua.State) int {
 		return 2
 	}
 
-	L.PushInteger(id)
+	L.PushInteger(int64(id))
 	return 1
 }
 
 func ltaskInitRoot(L *lua.State) int {
 	task := getPtr[ltask](L, "LTASK_GLOBAL")
-	var id serviceId = L.CheckInteger(1)
+	var id = serviceId(L.CheckInteger(1))
 	if id != serviceIdRoot {
 		return L.Errorf("Id should be ROOT(1)")
 	}
@@ -156,7 +156,7 @@ func lmessageReceipt(L *lua.State) int {
 	}
 	if receipt == messageReceiptResponse {
 		// only for schedule message NEW
-		L.PushInteger(m.to)
+		L.PushInteger(int64(m.to))
 		m.delete()
 		return 2
 	}
@@ -193,7 +193,7 @@ func lrecvMessage(L *lua.State) (r int) {
 		return
 	}
 	r = 3
-	L.PushInteger(m.from)
+	L.PushInteger(int64(m.from))
 	L.PushInteger((int64(m.session)))
 	L.PushInteger(int64(m.typ))
 	if m.msg != nil {
@@ -208,8 +208,8 @@ func lrecvMessage(L *lua.State) (r int) {
 func lpostMessage(L *lua.State) int {
 	L.CheckType(1, lua.LUA_TTABLE)
 	msg := newMessage(&message{
-		from:    checkField(L, 1, "from"),
-		to:      checkField(L, 1, "to"),
+		from:    int32(checkField(L, 1, "from")),
+		to:      int32(checkField(L, 1, "to")),
 		session: session(checkField(L, 1, "session")),
 		typ:     int(checkField(L, 1, "type")),
 	})
