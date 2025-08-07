@@ -138,17 +138,20 @@ func ltaskTimerUpdate(L *lua.State) int {
 		L.SetTop(1)
 		L.CheckType(1, lua.LUA_TTABLE)
 	}
-	var cnt int64
+	var idx int64
 	t.update(func(event *timerEvent) {
 		v := int64(event.session)
 		v = v<<32 | event.id
 		L.PushInteger(v)
-		cnt++
-		idx := cnt
+		idx++
 		L.SetI(1, int64(idx))
 	})
+	// Fill the rest of the table with nils
+	// if the number of timer events is less than cap of the table,
+	// so there are no old values left.
+	// { 1, 2, 3, 4, 5 } => { 6, 7, 8, nil, nil }
 	n := int64(L.RawLen(1))
-	for i := int64(cnt + 1); i <= n; i++ {
+	for i := int64(idx + 1); i <= n; i++ {
 		L.PushNil()
 		L.SetI(1, i)
 	}
