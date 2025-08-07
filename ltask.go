@@ -204,7 +204,7 @@ type ltask struct {
 	config              *ltaskConfig
 	workers             []workerThread
 	eventInit           [maxSockEvent]atomicInt
-	event               []*xxchan.Channel[struct{}]
+	event               [maxSockEvent]*xxchan.Channel[struct{}]
 	services            *servicePool
 	schedule            *xxchan.Channel[int]
 	timer               *timer
@@ -276,17 +276,12 @@ func (task *ltask) init(L *lua.State, config *ltaskConfig) {
 	atomic.StoreInt64(&task.activeWorker, 0)
 	atomic.StoreInt64(&task.threadCount, 0)
 
-	event := make([]*xxchan.Channel[struct{}], maxSockEvent)
-	for i := range task.eventInit {
-		task.eventInit[i] = 0
-	}
-	for i := range event {
+	for i := range task.event {
 		ptr := malloc.Alloc(uint(xxchan.Sizeof[struct{}](1)))
 		ch := xxchan.Make[struct{}](ptr, 1)
-		event[i] = ch
+		task.event[i] = ch
 		atomic.StoreInt64(&task.eventInit[i], 0)
 	}
-	task.event = event
 }
 
 func (task *ltask) initWorker(L *lua.State) {

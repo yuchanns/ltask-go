@@ -339,6 +339,7 @@ func (p *servicePool) setStatus(id serviceId, status int64) {
 	if s == nil {
 		return
 	}
+	log.Debug().Msgf("Set service %d status to %d", id, status)
 	s.status = status
 }
 

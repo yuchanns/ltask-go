@@ -1,6 +1,7 @@
 package ltask
 
 import (
+	"fmt"
 	"runtime"
 	"sync/atomic"
 	"unsafe"
@@ -579,7 +580,7 @@ func (w *workerThread) start() {
 		} else {
 			log.Debug().Msgf("Service %d is running on worker %d", id, w.workerId)
 			if status != serviceStatusSchedule {
-				panic("Service is not in schedule status")
+				panic(fmt.Sprintf("Service %d not in schedule status: %d", id, status))
 			}
 			p.setStatus(id, serviceStatusRunning)
 			if !p.resume(id) {
