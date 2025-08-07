@@ -203,8 +203,9 @@ func (t *timer) execute(fn timerExecuteFunc, ud *timerUpdateUd) {
 
 func (t *timer) shift() {
 	t.assert()
-	mask := int32(timeNear)
-	ct := int32(t.time + 1)
+	mask := uint32(timeNear)
+	t.time++
+	ct := t.time
 	if ct == 0 {
 		t.moveList(3, 0)
 		return

@@ -133,7 +133,8 @@ func timerCallback(tu *timerUpdateUd, event *timerEvent) {
 	v := int64(event.session)
 	v = v<<32 | event.id
 	L.PushInteger(v)
-	idx := tu.n + 1
+	tu.n++
+	idx := tu.n
 	L.SetI(1, int64(idx))
 }
 
