@@ -506,10 +506,7 @@ end
 SESSION[MESSAGE_SYSTEM] = function(type, msg, sz) system(ltask.unpack_remove(msg, sz)) end
 
 local function request(command, ...)
-  if service == nil then
-    error("Service is not initialized")
-    return
-  end
+  assert(service)
   local s = service[command]
   if not s then
     error("Unknown request command: " .. command)
