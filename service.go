@@ -396,6 +396,7 @@ func (p *servicePool) newService(sid serviceId) (svcId serviceId) {
 	s.cpucost = 0
 	s.clock = 0
 	s.sockeventId = -1
+	s.label = [32]byte{}
 	p.setService(s)
 	return
 }
