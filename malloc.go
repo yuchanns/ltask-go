@@ -5,6 +5,7 @@ import (
 	"unsafe"
 
 	"github.com/smasher164/mem"
+	"go.yuchanns.xyz/timefall"
 )
 
 type Allocator interface {
@@ -16,6 +17,7 @@ var malloc Allocator
 
 func init() {
 	malloc = &defaultAllocator{}
+	timefall.SetAllocator(&timerAllocator{})
 }
 
 type defaultAllocator struct{}
@@ -38,4 +40,14 @@ func SetAllocator(alloc Allocator) {
 		panic("allocator can only be set once")
 	}
 	malloc = alloc
+}
+
+type timerAllocator struct{}
+
+func (t *timerAllocator) Alloc(size uint) unsafe.Pointer {
+	return malloc.Alloc(size)
+}
+
+func (t *timerAllocator) Free(ptr unsafe.Pointer) {
+	malloc.Free(ptr)
 }

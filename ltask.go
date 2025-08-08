@@ -11,6 +11,7 @@ import (
 
 	"github.com/phuslu/log"
 	"go.yuchanns.xyz/lua"
+	"go.yuchanns.xyz/timefall"
 	"go.yuchanns.xyz/xxchan"
 )
 
@@ -91,7 +92,7 @@ func getS(L *lua.State) *serviceUd {
 
 func ltaskSleep(L *lua.State) int {
 	csec := L.OptInteger(1, 0)
-	time.Sleep(Centisecond * time.Duration(csec))
+	time.Sleep(centisecond * time.Duration(csec))
 	return 0
 }
 
@@ -124,7 +125,7 @@ func ltaskTimerAdd(L *lua.State) int {
 	if ti < 0 || ti != int64(int32(ti)) {
 		return L.Errorf("Invalid timer time: %d", ti)
 	}
-	t.add(ev, int32(ti))
+	t.Add(ev, time.Duration(ti)*centisecond)
 	return 0
 }
 
@@ -139,7 +140,7 @@ func ltaskTimerUpdate(L *lua.State) int {
 		L.CheckType(1, lua.LUA_TTABLE)
 	}
 	var idx int64
-	t.update(func(event *timerEvent) {
+	t.Update(func(event *timerEvent) {
 		// Pack session and id into a single int64 value
 		v := int64(event.session)<<32 | int64(event.id)
 		L.PushInteger(v)
@@ -204,7 +205,7 @@ type ltask struct {
 	event               [maxSockEvent]*xxchan.Channel[struct{}]
 	services            *servicePool
 	schedule            *xxchan.Channel[int]
-	timer               *timer[timerEvent]
+	timer               *timefall.Timer[timerEvent]
 	lqueue              *logQueue
 	externalMessage     *xxchan.Channel[unsafe.Pointer]
 	externalLastMessage *message

@@ -16,6 +16,8 @@ github.com/stretchr/testify v1.10.0 h1:Xv5erBjTwe/5IxqUQTdXv5kgmIvbHo3QQyRwhJsOf
 github.com/stretchr/testify v1.10.0/go.mod h1:r2ic/lqez/lEtzL7wO/rwa5dbSLXVDPFyf8C91i36aY=
 go.yuchanns.xyz/lua v0.0.0-20250727075619-463d1051632b h1:ajC1JBFxyfTEtebnIUU+Oj4QBPp3C6dL/oElbG3O2Lo=
 go.yuchanns.xyz/lua v0.0.0-20250727075619-463d1051632b/go.mod h1:+R8nITRHih7Fm5mzxDMq4TgtGLGUkCgY9WWcYunSvHM=
+go.yuchanns.xyz/timefall v0.1.0 h1:LGRBPW8qXeGQFWLFN2esns6x2pe12QxM/MIGou4qoBU=
+go.yuchanns.xyz/timefall v0.1.0/go.mod h1:23LIkzY6IqM8GxLglCVpaPAyZ3u77seVezRB6g9moHc=
 go.yuchanns.xyz/xxchan v0.1.0 h1:0ZjPsmoYPqWHPm5siMMjLai9XYv8kUt06l0WCBYR5BA=
 go.yuchanns.xyz/xxchan v0.1.0/go.mod h1:GnRPr1zN3Me0NDQNv734GzC9c48AVkWTFPpZHsGd8eU=
 go.yuchanns.xyz/xxcond v0.1.0 h1:/Ho8r0cbz/4o3F9JPFUgmGQ1HxArbPReCOUmnqzlOW4=

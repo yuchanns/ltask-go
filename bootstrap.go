@@ -6,9 +6,11 @@ import (
 	"runtime"
 	"sync"
 	"sync/atomic"
+	"time"
 	"unsafe"
 
 	"go.yuchanns.xyz/lua"
+	"go.yuchanns.xyz/timefall"
 )
 
 func getPtr[T any](L *lua.State, key string) *T {
@@ -88,12 +90,14 @@ type timerUpdateUd struct {
 	n int
 }
 
+var centisecond = time.Duration(10 * time.Millisecond)
+
 func ltaskInitTimer(L *lua.State) int {
 	task := getPtr[ltask](L, "LTASK_GLOBAL")
 	if task.timer != nil {
 		return L.Errorf("Timer can init only once")
 	}
-	task.timer = newTimer[timerEvent]()
+	task.timer = timefall.New[timerEvent](centisecond)
 
 	return 0
 }
@@ -322,7 +326,7 @@ func ltaskDeinit(L *lua.State) int {
 	}
 	malloc.Free(unsafe.Pointer(task.schedule))
 	task.schedule = nil
-	task.timer.destroy()
+	task.timer.Destroy()
 
 	L.PushNil()
 	L.SetField(lua.LUA_REGISTRYINDEX, "LTASK_GLOBAL")
