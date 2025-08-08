@@ -526,7 +526,7 @@ function ltask.post_message(addr, session, type, msg, sz)
   return ltask.message_receipt()
 end
 
-function ltask.rasie_error(addr, session, message)
+function ltask.raise_error(addr, session, message)
   if session == SESSION_SEND_MESSAGE then return end
   local errobj = traceback(message, 4)
   post_response_message(addr, session, MESSAGE_ERROR, ltask.pack(errobj))

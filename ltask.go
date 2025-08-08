@@ -63,6 +63,7 @@ func ltaskOpen(L *lua.State) int {
 		{Name: "self", Func: lself},
 		{Name: "timer_add", Func: ltaskTimerAdd},
 		{Name: "timer_update", Func: ltaskTimerUpdate},
+		{Name: "now", Func: ltaskNow},
 		{Name: "label", Func: ltaskLabel},
 		{Name: "pushlog", Func: ltaskPushLog},
 		{Name: "poplog", Func: ltaskPopLog},
@@ -114,7 +115,7 @@ func ltaskEventInit(L *lua.State) int {
 func ltaskTimerAdd(L *lua.State) int {
 	s := getS(L)
 	t := s.task.timer
-	if s == nil {
+	if t == nil {
 		return L.Errorf("Init timer before bootstrap")
 	}
 	ev := &timerEvent{
@@ -131,10 +132,10 @@ func ltaskTimerAdd(L *lua.State) int {
 
 func ltaskTimerUpdate(L *lua.State) int {
 	s := getS(L)
-	if s == nil {
+	t := s.task.timer
+	if t == nil {
 		return L.Errorf("Init timer before bootstrap")
 	}
-	t := s.task.timer
 	if L.GetTop() > 1 {
 		L.SetTop(1)
 		L.CheckType(1, lua.LUA_TTABLE)
@@ -157,6 +158,19 @@ func ltaskTimerUpdate(L *lua.State) int {
 		L.SetI(1, i)
 	}
 	return 1
+}
+
+func ltaskNow(L *lua.State) int {
+	s := getS(L)
+	t := s.task.timer
+	if t == nil {
+		return L.Errorf("Init timer before bootstrap")
+	}
+	start := t.Start()
+	now := t.Now()
+	L.PushInteger(start + now/100)
+	L.PushInteger(start*100 + now)
+	return 2
 }
 
 func lself(L *lua.State) int {

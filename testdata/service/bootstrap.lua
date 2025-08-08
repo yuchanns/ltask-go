@@ -1,7 +1,13 @@
 local ltask = require("ltask")
 
-print("Bootstrap Begin")
+local arg = ...
 
-ltask.sleep(30)
+print("Bootstrap Begin")
+print(os.date("%c", (ltask.now())))
+local addr = ltask.spawn("user", "Hello")
+
+print("Spawn user", addr)
+
+ltask.send(addr, "exit")
 
 print("Bootstrap End")
