@@ -1,12 +1,15 @@
 package ltask
 
 import (
+	"embed"
 	"runtime"
 	"sync"
 	"sync/atomic"
+	"time"
 	"unsafe"
 
 	"go.yuchanns.xyz/lua"
+	"go.yuchanns.xyz/timefall"
 )
 
 func getPtr[T any](L *lua.State, key string) *T {
@@ -24,6 +27,9 @@ func getPtr[T any](L *lua.State, key string) *T {
 
 	return (*T)(v)
 }
+
+//go:embed lualib/*.lua service/*.lua
+var embedfs embed.FS
 
 func ltaskInit(L *lua.State) int {
 	if L.GetTop() == 0 {
@@ -51,12 +57,36 @@ func ltaskInit(L *lua.State) int {
 	return 1
 }
 
+func ltaskBootPushLog(L *lua.State) int {
+	L.CheckType(1, lua.LUA_TLIGHTUSERDATA)
+	task := getPtr[ltask](L, "LTASK_GLOBAL")
+	data := L.ToUserData(1)
+	sz := L.CheckInteger(2)
+	if !task.pushLog(serviceIdSystem, data, sz) {
+		return L.Errorf("log error")
+	}
+
+	return 0
+}
+
+type timerEvent struct {
+	session session
+	id      serviceId
+}
+
+type timerUpdateUd struct {
+	L *lua.State
+	n int
+}
+
+var centisecond = time.Duration(10 * time.Millisecond)
+
 func ltaskInitTimer(L *lua.State) int {
 	task := getPtr[ltask](L, "LTASK_GLOBAL")
 	if task.timer != nil {
 		return L.Errorf("Timer can init only once")
 	}
-	task.timer = newTimer()
+	task.timer = timefall.New[timerEvent](centisecond)
 
 	return 0
 }
@@ -66,8 +96,8 @@ func ltaskNewService(L *lua.State) int {
 	label := L.CheckString(1)
 	source := L.CheckString(2)
 	chunkName := L.CheckString(3)
-	sid := L.OptInteger(4, 0)
-	workerId := L.OptInteger(5, -1)
+	sid := serviceId(L.OptInteger(4, 0))
+	workerId := int32(L.OptInteger(5, -1))
 
 	id := task.services.newService(sid)
 
@@ -77,13 +107,13 @@ func ltaskNewService(L *lua.State) int {
 		return 2
 	}
 
-	L.PushInteger(id)
+	L.PushInteger(int64(id))
 	return 1
 }
 
 func ltaskInitRoot(L *lua.State) int {
 	task := getPtr[ltask](L, "LTASK_GLOBAL")
-	var id serviceId = L.CheckInteger(1)
+	var id = serviceId(L.CheckInteger(1))
 	if id != serviceIdRoot {
 		return L.Errorf("Id should be ROOT(1)")
 	}
@@ -107,16 +137,76 @@ func checkField(L *lua.State, index int, key string) int64 {
 	return v
 }
 
+func lmessageReceipt(L *lua.State) int {
+	s := getS(L)
+	receipt, m := s.task.services.readReceipt(s.id)
+	if receipt == messageReceiptNone {
+		return L.Errorf("No receipt")
+	}
+	L.PushInteger(receipt)
+	if m == nil {
+		return 1
+	}
+	if receipt == messageReceiptResponse {
+		// only for schedule message NEW
+		L.PushInteger(int64(m.to))
+		m.delete()
+		return 2
+	}
+	if m.msg == nil {
+		m.delete()
+		return 1
+	}
+	L.PushLightUserData(m.msg)
+	L.PushInteger(m.sz)
+	m.delete()
+
+	return 3
+}
+
+func lsendMessage(L *lua.State) int {
+	s := getS(L)
+	msg := genSendMessage(L, s.id)
+	if !L.IsYieldable() {
+		msg.delete()
+		return L.Errorf("Cannot send message in none-yieldable context")
+	}
+	if !s.task.services.sendMessage(s.id, msg) {
+		msg.delete()
+		return L.Errorf("Cannot send message")
+	}
+
+	return 0
+}
+
+func lrecvMessage(L *lua.State) (r int) {
+	s := getS(L)
+	m := s.task.services.popMessage(s.id)
+	if m == nil {
+		return
+	}
+	r = 3
+	L.PushInteger(int64(m.from))
+	L.PushInteger((int64(m.session)))
+	L.PushInteger(int64(m.typ))
+	if m.msg != nil {
+		L.PushLightUserData(m.msg)
+		L.PushInteger(m.sz)
+		r += 2
+	}
+	m.delete()
+	return
+}
+
 func lpostMessage(L *lua.State) int {
-	typ, _ := L.GetField(1, "type")
 	L.CheckType(1, lua.LUA_TTABLE)
 	msg := newMessage(&message{
-		from:    checkField(L, 1, "from"),
-		to:      checkField(L, 1, "to"),
+		from:    int32(checkField(L, 1, "from")),
+		to:      int32(checkField(L, 1, "to")),
 		session: session(checkField(L, 1, "session")),
-		typ:     typ,
+		typ:     int(checkField(L, 1, "type")),
 	})
-	typ, _ = L.GetField(1, "message")
+	typ, _ := L.GetField(1, "message")
 	if typ != lua.LUA_TNIL {
 		if typ != lua.LUA_TLIGHTUSERDATA {
 			return L.Errorf(".message should be a pointer")
@@ -191,6 +281,7 @@ func ltaskWait(L *lua.State) int {
 	ctx := (*taskContext)(L.ToUserData(1))
 	ctx.wg.Wait()
 
+	ctx.task.lqueue.delete()
 	for i := range ctx.task.event {
 		for ctx.task.event[i].Len() > 0 {
 			ctx.task.event[i].Pop()
@@ -224,7 +315,7 @@ func ltaskDeinit(L *lua.State) int {
 	}
 	malloc.Free(unsafe.Pointer(task.schedule))
 	task.schedule = nil
-	task.timer.destroy()
+	task.timer.Destroy()
 
 	L.PushNil()
 	L.SetField(lua.LUA_REGISTRYINDEX, "LTASK_GLOBAL")
@@ -237,22 +328,27 @@ func ltaskBootstrapOpen(L *lua.State) int {
 	if bootInit.Add(1) != 1 {
 		return L.Errorf("ltask.bootstrap can only require once")
 	}
-	l := []luaLReg{
-		{"init", ltaskInit},
-		{"deinit", ltaskDeinit},
-		{"run", ltaskRun},
-		{"wait", ltaskWait},
-		{"post_message", lpostMessage},
-		{"new_service", ltaskNewService},
-		{"init_timer", ltaskInitTimer},
-		{"init_root", ltaskInitRoot},
+	l := []*lua.Reg{
+		{Name: "searchpath", Func: ltaskSearchPath},
+		{Name: "readfile", Func: ltaskReadFile},
+		{Name: "loadfile", Func: ltaskLoadFile},
+		{Name: "dofile", Func: ltaskDoFile},
+		{Name: "init", Func: ltaskInit},
+		{Name: "deinit", Func: ltaskDeinit},
+		{Name: "run", Func: ltaskRun},
+		{Name: "wait", Func: ltaskWait},
+		{Name: "post_message", Func: lpostMessage},
+		{Name: "new_service", Func: ltaskNewService},
+		{Name: "init_timer", Func: ltaskInitTimer},
+		{Name: "init_root", Func: ltaskInitRoot},
+		{Name: "pushlog", Func: ltaskBootPushLog},
 		// We don't need `init_socket` here, as it is proceed by Go runtime automatically.
-		{"pack", LuaSerdePack},
-		{"unpack", LuaSerdeUnpack},
-		{"remove", LuaSerdeRemove},
-		{"unpack_remove", LuaSerdeUnpackRemove},
+		{Name: "pack", Func: LuaSerdePack},
+		{Name: "unpack", Func: LuaSerdeUnpack},
+		{Name: "remove", Func: LuaSerdeRemove},
+		{Name: "unpack_remove", Func: LuaSerdeUnpackRemove},
 	}
 
-	luaLNewLib(L, l)
+	L.NewLib(l)
 	return 1
 }

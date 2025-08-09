@@ -2,13 +2,11 @@ package ltask_test
 
 import (
 	"fmt"
-	"os"
 	"reflect"
 	"runtime"
 	"strings"
 	"testing"
 
-	"github.com/iancoleman/strcase"
 	"github.com/stretchr/testify/require"
 	"go.yuchanns.xyz/ltask"
 	"go.yuchanns.xyz/lua"
@@ -44,6 +42,7 @@ func (s *Suite) TearDown() {
 }
 
 func TestSuite(t *testing.T) {
+	t.Parallel()
 	assert := require.New(t)
 
 	suite := &Suite{}
@@ -52,48 +51,35 @@ func TestSuite(t *testing.T) {
 
 	t.Cleanup(suite.TearDown)
 
-	// Run testdata tests
-	testDir := "testdata"
-	ents, err := os.ReadDir(testDir)
-	assert.NoError(err)
+	t.Run("ltask", func(t *testing.T) {
+		t.Parallel()
+		assert := require.New(t)
 
-	L, err := suite.lib.NewState()
-	assert.NoError(err)
-
-	L.OpenLibs()
-
-	ltask.OpenLibs(L, suite.lib)
-
-	t.Cleanup(L.Close)
-
-	for _, ent := range ents {
-		if ent.IsDir() {
-			continue
-		}
-		if !strings.HasPrefix(ent.Name(), "test_") {
-			continue
-		}
-		if !strings.HasSuffix(ent.Name(), ".lua") {
-			continue
-		}
-		sname := strcase.ToCamel(strings.TrimPrefix(strings.TrimSuffix(ent.Name(), ".lua"), "test_"))
-		scode, err := os.ReadFile(fmt.Sprintf("%s/%s", testDir, ent.Name()))
+		L, err := suite.lib.NewState()
 		assert.NoError(err)
 
-		t.Run(sname, func(t *testing.T) {
-			assert := require.New(t)
+		L.OpenLibs()
 
-			assert.NoError(L.DoString(string(scode)))
-		})
-	}
+		ltask.OpenLibs(L, suite.lib)
 
-	// Run tests in the suite
+		t.Cleanup(L.Close)
+
+		assert.NoError(L.DoFile("test.lua"))
+	})
+
 	tt := reflect.TypeOf(suite)
 	for i := range tt.NumMethod() {
 		method := tt.Method(i)
 		if testFunc, ok := method.Func.Interface().(func(*Suite, *require.Assertions, *lua.State)); ok {
 			t.Run(strings.TrimPrefix(method.Name, "Test"), func(t *testing.T) {
+				t.Parallel()
 				assert := require.New(t)
+				L, err := suite.lib.NewState()
+				assert.NoError(err)
+
+				L.OpenLibs()
+
+				t.Cleanup(L.Close)
 
 				testFunc(suite, assert, L)
 			})

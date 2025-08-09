@@ -1,6 +1,8 @@
 package ltask
 
 import (
+	"fmt"
+	"runtime"
 	"sync/atomic"
 	"unsafe"
 
@@ -11,11 +13,11 @@ import (
 
 const bindingServiceQueue = 16
 
-type serviceId = int64
+type serviceId = int32
 
 type workerThread struct {
 	task         *ltask
-	workerId     int64
+	workerId     int32
 	running      serviceId
 	binding      serviceId
 	waiting      serviceId
@@ -36,8 +38,8 @@ func (w *workerThread) init(task *ltask, id serviceId) {
 	w.running = 0
 	w.binding = 0
 	w.waiting = 0
-	atomic.StoreInt64(&w.serviceReady, 0)
-	atomic.StoreInt64(&w.serviceDone, 0)
+	atomic.StoreInt32(&w.serviceReady, 0)
+	atomic.StoreInt32(&w.serviceDone, 0)
 	w.termSignal = 0
 	w.sleeping = 0
 	w.wakeup = 0
@@ -62,7 +64,7 @@ func (w *workerThread) getJob() (id serviceId) {
 		if job == 0 {
 			break
 		}
-		atomic.CompareAndSwapInt64(&w.serviceReady, job, 0)
+		atomic.CompareAndSwapInt32(&w.serviceReady, job, 0)
 		id = serviceId(job)
 		break
 	}
@@ -70,7 +72,7 @@ func (w *workerThread) getJob() (id serviceId) {
 }
 
 func (w *workerThread) acquireScheduler() (ok bool) {
-	ok = atomic.CompareAndSwapInt64(&w.task.scheduleOwner, threadNone, w.workerId)
+	ok = atomic.CompareAndSwapInt32(&w.task.scheduleOwner, threadNone, w.workerId)
 	if ok {
 		log.Debug().Msgf("Worker %d acquired scheduler", w.workerId)
 	}
@@ -79,10 +81,10 @@ func (w *workerThread) acquireScheduler() (ok bool) {
 }
 
 func (w *workerThread) releaseScheduler() {
-	if atomic.LoadInt64(&w.task.scheduleOwner) != w.workerId {
+	if atomic.LoadInt32(&w.task.scheduleOwner) != w.workerId {
 		panic("Worker trying to release scheduler it does not own")
 	}
-	atomic.CompareAndSwapInt64(&w.task.scheduleOwner, w.workerId, threadNone)
+	atomic.CompareAndSwapInt32(&w.task.scheduleOwner, w.workerId, threadNone)
 	log.Debug().Msgf("Worker %d released scheduler", w.workerId)
 }
 
@@ -132,7 +134,7 @@ func (task *ltask) quitAllWorkers() {
 func (task *ltask) dispatchExternalMessages() {
 	var send bool
 	if task.externalLastMessage != nil {
-		if task.services.pushMessage(task.externalLastMessage) {
+		if task.services.pushMessage(task.externalLastMessage.to, task.externalLastMessage) {
 			return
 		}
 		task.externalLastMessage = nil
@@ -145,15 +147,15 @@ func (task *ltask) dispatchExternalMessages() {
 		}
 		buf := serdePackString("external", msg)
 		msg, sz := mallocFromBuffer(buf)
-		m := &message{
+		m := newMessage(&message{
 			from:    0,
 			to:      1, // root
 			session: 0,
 			typ:     messageTypeRequest,
 			msg:     msg,
 			sz:      int64(sz),
-		}
-		if task.services.pushMessage(m) {
+		})
+		if task.services.pushMessage(m.to, m) {
 			// blocked, save the message for next time
 			task.externalLastMessage = m
 			return
@@ -219,11 +221,12 @@ func (task *ltask) assignPrepare(prepare []serviceId) {
 				}
 			}
 			w := &task.workers[workerId]
+			workerId++
 			if !(useBusy || w.busy == 0) || !(w.binding == 0 || useBinding) {
 				continue
 			}
 			assign := w.assignJob(id)
-			if id == 0 {
+			if assign == 0 {
 				continue
 			}
 			w.wake()
@@ -280,7 +283,7 @@ func (task *ltask) countFreeSlots() (slots int) {
 			slots++
 			continue
 		}
-		atomic.StoreInt64(&w.serviceReady, id)
+		atomic.StoreInt32(&w.serviceReady, id)
 		w.kickRunning(id)
 		w.wake()
 		log.Debug().Msgf("Worker %d is assigned service %d from binding queue", w.workerId, id)
@@ -320,7 +323,7 @@ func (task *ltask) dispatchOutMessages(doneJobs []serviceId) {
 				p.deleteService(id)
 				continue
 			}
-			if p.pushMessage(msg) {
+			if p.pushMessage(msg.to, msg) {
 				log.Debug().Msgf("Root service is blocked, service %d will try to signal it later", id)
 				task.scheduleBack(id)
 				continue
@@ -330,13 +333,25 @@ func (task *ltask) dispatchOutMessages(doneJobs []serviceId) {
 			continue
 		}
 		if msg != nil {
-			task.dispatchOutMessage(msg)
+			task.dispatchOutMessage(id, msg)
 		}
 		if status != serviceStatusDone {
 			panic("Service status is not done")
 		}
 		if !p.hasMessage(id) {
-			// TODO: schedule back for sockevent
+			sockId := p.getSockevent(id)
+			if sockId >= 0 {
+				log.Debug().Msgf("Service %d back to schedule", id)
+				p.pushMessage(id, newMessage(&message{
+					from:    serviceIdSystem,
+					to:      id,
+					session: 0,
+					typ:     messageTypeIdle,
+				}))
+				p.setStatus(id, serviceStatusSchedule)
+				task.scheduleBack(id)
+				continue
+			}
 			log.Debug().Msgf("Service %d is idle", id)
 			p.setStatus(id, serviceStatusIdle)
 		} else {
@@ -347,17 +362,45 @@ func (task *ltask) dispatchOutMessages(doneJobs []serviceId) {
 	}
 }
 
-func (task *ltask) dispatchOutMessage(msg *message) {
+func (task *ltask) dispatchScheduleMessage(id serviceId, msg *message) {
+	p := task.services
+	if id != serviceIdRoot {
+		// only root can send schedule message
+		p.writeReceipt(id, messageReceiptError, msg)
+		return
+	}
+	sid := msg.session
+	switch msg.typ {
+	case messageScheduleNew:
+		msg.to = p.newService(sid)
+		log.Debug().Msgf("New service %d", msg.to)
+		if msg.to == 0 {
+			p.writeReceipt(id, messageReceiptError, msg)
+		} else {
+			p.writeReceipt(id, messageReceiptResponse, msg)
+		}
+	case messageScheduleDel:
+		log.Debug().Msgf("Delete service %d", sid)
+		p.deleteService(serviceId(sid))
+		msg.delete()
+		p.writeReceipt(id, messageReceiptDone, nil)
+	default:
+		p.writeReceipt(id, messageReceiptError, msg)
+	}
+}
+
+func (task *ltask) dispatchOutMessage(id serviceId, msg *message) {
 	p := task.services
 	if msg.to == serviceIdSystem {
+		task.dispatchScheduleMessage(id, msg)
 		return
 	}
 	if s := p.getService(msg.to); s == nil || s.status == serviceStatusDead {
-		p.writeReceipt(msg.to, messageReceiptError, msg)
-	} else if p.pushMessage(msg) {
-		p.writeReceipt(msg.to, messageReceiptBlock, msg)
+		p.writeReceipt(id, messageReceiptError, msg)
+	} else if p.pushMessage(msg.to, msg) {
+		p.writeReceipt(id, messageReceiptBlock, msg)
 	} else {
-		p.writeReceipt(msg.to, messageReceiptDone, nil)
+		p.writeReceipt(id, messageReceiptDone, nil)
 	}
 	task.checkMessageTo(msg.to)
 }
@@ -374,7 +417,7 @@ func (w *workerThread) doneJob() (job serviceId) {
 }
 
 func (w *workerThread) completeJob() (ok bool) {
-	if atomic.CompareAndSwapInt64(&w.serviceDone, 0, w.running) {
+	if atomic.CompareAndSwapInt32(&w.serviceDone, 0, w.running) {
 		w.running = 0
 		ok = true
 	}
@@ -399,7 +442,7 @@ func (w *workerThread) schedule() (noJob bool) {
 		return
 	}
 	log.Debug().Msgf("Worker %d stealing service %d", w.workerId, job)
-	atomic.StoreInt64(&w.serviceReady, job)
+	atomic.StoreInt32(&w.serviceReady, job)
 	return
 }
 
@@ -423,7 +466,7 @@ func (w *workerThread) stolen() (id serviceId) {
 		// job is binding to the worker, can't steal
 		return
 	}
-	if atomic.CompareAndSwapInt64(&w.serviceReady, job, 0) {
+	if atomic.CompareAndSwapInt32(&w.serviceReady, job, 0) {
 		id = job
 		w.waiting = 0
 	}
@@ -489,7 +532,7 @@ func (w *workerThread) quit() {
 
 func (w *workerThread) start() {
 	p := w.task.services
-	atomic.AddInt64(&w.task.activeWorker, 1)
+	atomic.AddInt32(&w.task.activeWorker, 1)
 	log.Debug().Msgf("Worker %d start", w.workerId)
 
 	for {
@@ -504,6 +547,7 @@ func (w *workerThread) start() {
 
 			for {
 				if !w.acquireScheduler() {
+					runtime.Gosched()
 					continue
 				}
 				noJob = w.schedule()
@@ -516,10 +560,10 @@ func (w *workerThread) start() {
 
 			if noJob && w.task.blockedService == 0 {
 				// go to sleep if no job and no blocked service
-				atomic.AddInt64(&w.task.threadCount, -1)
+				atomic.AddInt32(&w.task.threadCount, -1)
 				log.Debug().Msgf("Worker %d sleeping", w.workerId)
 				w.sleep()
-				atomic.AddInt64(&w.task.activeWorker, 1)
+				atomic.AddInt32(&w.task.activeWorker, 1)
 				log.Debug().Msgf("Worker %d wakeup", w.workerId)
 			}
 			continue
@@ -536,7 +580,7 @@ func (w *workerThread) start() {
 		} else {
 			log.Debug().Msgf("Service %d is running on worker %d", id, w.workerId)
 			if status != serviceStatusSchedule {
-				panic("Service is not in schedule status")
+				panic(fmt.Sprintf("Service %d not in schedule status: %d", id, status))
 			}
 			p.setStatus(id, serviceStatusRunning)
 			if !p.resume(id) {
@@ -544,12 +588,13 @@ func (w *workerThread) start() {
 				log.Debug().Msgf("Service %d quit", id)
 				p.setStatus(id, serviceStatusDead)
 				if id == serviceIdRoot {
+					log.Debug().Msg("Root quit")
 					// root quit, wakeup others
 					w.task.quitAllWorkers()
 					w.task.wakeupAlWorkers()
 					break
 				}
-				//
+				w.task.services.sendSignal(id)
 			} else {
 				p.setStatus(id, serviceStatusDone)
 			}
@@ -573,6 +618,7 @@ func (w *workerThread) start() {
 				// Still unable to complete job, try to dispatch
 				w.dispatch()
 				for !w.completeJob() {
+					runtime.Gosched()
 				}
 			}
 			w.schedule()
@@ -581,7 +627,7 @@ func (w *workerThread) start() {
 		}
 	}
 	w.quit()
-	atomic.AddInt64(&w.task.threadCount, -1)
+	atomic.AddInt32(&w.task.threadCount, -1)
 	log.Debug().Msgf("Worker %d quit", w.workerId)
 
 }

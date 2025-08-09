@@ -531,7 +531,8 @@ func (rb *readBlock) readPointer() (unsafe.Pointer, bool) {
 	if !ok {
 		return nil, false
 	}
-	return unsafe.Pointer(uintptr(data)), true
+	// Supress the "possible misuse of unsafe.Pointer" warning
+	return *(*unsafe.Pointer)(unsafe.Pointer(&data)), true
 }
 
 func (rb *readBlock) getInteger(L *lua.State, cookie uint8) int64 {

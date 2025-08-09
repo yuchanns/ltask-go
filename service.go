@@ -1,11 +1,14 @@
 package ltask
 
 import (
+	"bytes"
 	"fmt"
+	"slices"
 	"time"
 	"unsafe"
 
 	"github.com/phuslu/log"
+	"github.com/smasher164/mem"
 	"go.yuchanns.xyz/lua"
 	"go.yuchanns.xyz/xxchan"
 )
@@ -42,7 +45,8 @@ type service struct {
 	bounce        *message
 	status        int64
 	receipt       int64
-	bindingThread int64
+	bindingThread int32
+	sockeventId   int64
 	id            serviceId
 	label         [32]byte
 	stat          memoryStat
@@ -90,7 +94,7 @@ func (s *service) requiref(name string, fn lua.GoFunc, pL *lua.State) (ok bool) 
 	return true
 }
 
-func (s *service) setBinding(workerThread int64) {
+func (s *service) setBinding(workerThread int32) {
 	s.bindingThread = workerThread
 }
 
@@ -138,9 +142,9 @@ func (s *service) close() {
 }
 
 type servicePool struct {
-	mask     int64
+	mask     int32
 	queueLen int64
-	id       int64
+	id       int32
 	s        []*service
 }
 
@@ -175,6 +179,62 @@ func (task *ltask) scheduleBack(id serviceId) {
 	}
 }
 
+func (p *servicePool) initSockevent(id serviceId, index int64) {
+	s := p.getService(id)
+	if s == nil {
+		return
+	}
+	s.sockeventId = index
+}
+
+func (p *servicePool) getSockevent(id serviceId) (sockeventId int64) {
+	s := p.getService(id)
+	if s == nil {
+		return
+	}
+	sockeventId = s.sockeventId
+	return
+}
+
+func (p *servicePool) sendSignal(id serviceId) {
+	s := p.getService(id)
+	if s == nil {
+		return
+	}
+	if s.out != nil {
+		s.out.delete()
+	}
+	s.out = newMessage(&message{
+		from:    id,
+		to:      serviceIdRoot,
+		session: 0,
+		typ:     messageTypeSignal,
+	})
+}
+
+func (p *servicePool) readReceipt(id serviceId) (receipt int64, r *message) {
+	s := p.getService(id)
+	if s == nil {
+		receipt = messageReceiptNone
+		return
+	}
+	receipt = s.receipt
+	r = s.bounce
+	s.receipt = messageReceiptNone
+	s.bounce = nil
+	return
+}
+
+func (p *servicePool) sendMessage(id serviceId, msg *message) (ok bool) {
+	s := p.getService(id)
+	if s == nil || s.out != nil {
+		return
+	}
+	s.out = msg
+	ok = true
+	return
+}
+
 func (p *servicePool) outMessage(id serviceId) (out *message) {
 	s := p.getService(id)
 	if s == nil {
@@ -186,12 +246,25 @@ func (p *servicePool) outMessage(id serviceId) (out *message) {
 	return
 }
 
+func (p *servicePool) getLabel(id serviceId) string {
+	s := p.getService(id)
+	if s == nil {
+		return "<dead service>"
+	}
+	n := bytes.IndexByte(s.label[:], 0)
+	if n == -1 {
+		n = len(s.label)
+	}
+	return string(s.label[:n])
+}
+
 func (p *servicePool) writeReceipt(id serviceId, receipt int64, bounce *message) {
 	s := p.getService(id)
 	if s == nil || s.receipt != messageReceiptNone {
 		log.Error().Msgf("WARNING: write recipt %d fail (%d)", id, s.receipt)
 	}
 	if s != nil {
+		s.bounce.delete()
 		s.receipt = receipt
 		s.bounce = bounce
 	}
@@ -223,8 +296,8 @@ func (p *servicePool) hasMessage(id serviceId) (has bool) {
 	return s.msg.Len() > 0
 }
 
-func (p *servicePool) pushMessage(msg *message) (block bool) {
-	s := p.getService(msg.to)
+func (p *servicePool) pushMessage(id serviceId, msg *message) (block bool) {
+	s := p.getService(id)
 	if s == nil || s.status == serviceStatusDead {
 		return
 	}
@@ -266,6 +339,7 @@ func (p *servicePool) setStatus(id serviceId, status int64) {
 	if s == nil {
 		return
 	}
+	log.Debug().Msgf("Set service %d status to %d", id, status)
 	s.status = status
 }
 
@@ -288,8 +362,8 @@ func (p *servicePool) postMessage(msg *message) (ok bool) {
 	return
 }
 
-func (p *servicePool) newService(sid int64) (svcId serviceId) {
-	var id int64
+func (p *servicePool) newService(sid serviceId) (svcId serviceId) {
+	var id serviceId
 	if sid != 0 {
 		id = sid
 		if p.getService(sid) != nil {
@@ -297,7 +371,7 @@ func (p *servicePool) newService(sid int64) (svcId serviceId) {
 		}
 	} else {
 		id = p.id
-		for i := int64(0); ; i++ {
+		for i := int32(0); ; i++ {
 			if i > p.mask {
 				return
 			}
@@ -314,15 +388,20 @@ func (p *servicePool) newService(sid int64) (svcId serviceId) {
 	s = (*service)(unsafe.Pointer(ptr))
 	s.receipt = messageReceiptNone
 	s.id = svcId
+	s.msg = nil
+	s.out = nil
+	s.bounce = nil
 	s.status = serviceStatusUninitialized
 	s.bindingThread = -1
 	s.cpucost = 0
 	s.clock = 0
+	s.sockeventId = -1
+	s.label = [32]byte{}
 	p.setService(s)
 	return
 }
 
-func (p *servicePool) getBindingThread(id serviceId) (thread int64) {
+func (p *servicePool) getBindingThread(id serviceId) (thread int32) {
 	s := p.getService(id)
 	if s == nil {
 		return
@@ -331,7 +410,7 @@ func (p *servicePool) getBindingThread(id serviceId) (thread int64) {
 	return
 }
 
-func (p *servicePool) getService(id int64) *service {
+func (p *servicePool) getService(id int32) *service {
 	return p.s[id&p.mask]
 }
 
@@ -355,9 +434,10 @@ func (p *servicePool) destroy() {
 }
 
 func initService(L *lua.State) int {
-	// ud := (*byte)(L.ToUserData(1))
-	// size := L.ToInteger(2)
-	// initServiceKey
+	// TODO: set ud as a string
+	ud := L.ToUserData(1)
+	L.PushLightUserData(ud)
+	L.SetField(lua.LUA_REGISTRYINDEX, "LTASK_ID")
 	L.OpenLibs()
 	return 0
 }
@@ -385,6 +465,31 @@ func errorMessage(fromL, toL *lua.State, msg string) {
 	toL.PushLightUserData(unsafe.Pointer(&msg))
 }
 
+func (p *servicePool) closeServiceMessages(L *lua.State, id serviceId) (reportError int) {
+	var index int
+	for {
+		m := p.popMessage(id)
+		if m == nil {
+			break
+		}
+		if slices.Contains([]int{messageTypeRequest, messageTypeSystem}, m.typ) {
+			if reportError == 0 {
+				L.NewTable()
+				reportError = 1
+				index = 1
+			}
+			L.PushInteger(int64(m.from))
+			L.RawSetI(-2, int64(index))
+			index++
+			L.PushInteger(int64(m.session))
+			L.RawSetI(-2, int64(index))
+			index++
+		}
+		m.delete()
+	}
+	return
+}
+
 func (p *servicePool) deleteService(id serviceId) {
 	s := p.getService(id)
 	if s == nil {
@@ -403,11 +508,12 @@ func requireModule(L *lua.State) int {
 }
 
 func (task *ltask) initService(L *lua.State, id serviceId, label string,
-	source string, chunkName string, workerId int64) (ok bool) {
-	ud := &serviceUd{
-		task: task,
-		id:   id,
-	}
+	source string, chunkName string, workerId int32) (ok bool) {
+	// FIXME: free memory of ud when service is delete
+	ptr := mem.Alloc(uint(unsafe.Sizeof(serviceUd{})))
+	ud := (*serviceUd)(unsafe.Pointer(ptr))
+	ud.task = task
+	ud.id = id
 	s := task.services.getService(id)
 	if s == nil {
 		L.PushString(fmt.Sprintf("Service %d not found", id))

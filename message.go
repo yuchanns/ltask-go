@@ -1,8 +1,12 @@
 package ltask
 
-import "unsafe"
+import (
+	"unsafe"
 
-type session = uint64
+	"go.yuchanns.xyz/lua"
+)
+
+type session = int32
 
 type message struct {
 	from    serviceId
@@ -11,6 +15,21 @@ type message struct {
 	typ     int
 	msg     unsafe.Pointer
 	sz      int64
+}
+
+func genSendMessage(L *lua.State, id serviceId) *message {
+	m := &message{
+		from:    id,
+		to:      int32(L.CheckInteger(1)),
+		session: session(L.CheckInteger(2)),
+		typ:     int(L.CheckInteger(3)),
+	}
+	if !L.IsNoneOrNil(4) {
+		L.CheckType(4, lua.LUA_TLIGHTUSERDATA)
+		m.msg = L.ToUserData(4)
+		m.sz = L.CheckInteger(5)
+	}
+	return newMessage(m)
 }
 
 func newMessage(m *message) *message {
@@ -42,4 +61,9 @@ const (
 	messageTypeError    = 3
 	messageTypeSignal   = 4
 	messageTypeIdle     = 5
+)
+
+const (
+	messageScheduleNew = 0
+	messageScheduleDel = 1
 )
