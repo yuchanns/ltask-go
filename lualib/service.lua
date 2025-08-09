@@ -460,7 +460,7 @@ end
 local function sys_service_init(t)
   _G.require = yieldable_require
   local initfunc = assert(load(t.initfunc))
-  local func = assert(initfunc(t.name))
+  local func = assert(initfunc(t.name, t.builtin))
   local handler = func(table.unpack(t.args))
   ltask.dispatch(handler)
   if service == nil then ltask.quit() end

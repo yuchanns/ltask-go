@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -52,6 +53,8 @@ func ltaskOpen(L *lua.State) int {
 		{Name: "remove", Func: LuaSerdeRemove},
 		{Name: "unpack_remove", Func: LuaSerdeUnpackRemove},
 		{Name: "timer_sleep", Func: ltaskSleep},
+		{Name: "loadfile", Func: ltaskLoadFile},
+		{Name: "searchpath", Func: ltaskSearchPath},
 	}
 
 	L.NewLib(l)
@@ -231,7 +234,7 @@ type ltask struct {
 }
 
 func (task *ltask) allocSockevent() (index int) {
-	for i := 0; i < maxSockEvent; i++ {
+	for i := range maxSockEvent {
 		if atomic.CompareAndSwapInt32(&task.eventInit[i], 0, 1) {
 			return i
 		}
@@ -331,4 +334,82 @@ func getErrorMessage(L *lua.State) string {
 		return L.ToString(-1)
 	}
 	return "Invalid error message"
+}
+
+func ltaskReadFile(L *lua.State) int {
+	fileName := L.CheckString(1)
+	scode, err := embedfs.ReadFile(fileName)
+	if err != nil {
+		L.PushNil()
+		L.PushString(err.Error())
+		return 2
+	}
+	L.PushString(string(scode))
+	return 1
+}
+
+func ltaskDoFile(L *lua.State) int {
+	fileName := L.CheckString(1)
+	scode, err := embedfs.ReadFile(fileName)
+	if err != nil {
+		L.PushNil()
+		L.PushString(err.Error())
+		return 2
+	}
+	L.SetTop(0)
+	err = L.DoString(string(scode))
+	if err != nil {
+		L.PushNil()
+		L.PushString(err.Error())
+		return 2
+	}
+	return L.GetTop()
+}
+
+func ltaskLoadFile(L *lua.State) int {
+	fileName := L.CheckString(1)
+	scode, err := embedfs.ReadFile(fileName)
+	if err != nil {
+		L.PushNil()
+		L.PushString(err.Error())
+		return 2
+	}
+	err = L.LoadString(string(scode))
+	if err != nil {
+		L.PushNil()
+		L.PushString(err.Error())
+		return 2
+	}
+	return 1
+}
+
+func ltaskSearchPath(L *lua.State) int {
+	name := L.CheckString(1)
+	pattern := L.CheckString(2)
+
+	patterns := strings.Split(pattern, ";")
+
+	modulePath := strings.ReplaceAll(name, ".", "/")
+
+	for _, pat := range patterns {
+		fullPattern := strings.ReplaceAll(pat, "?", modulePath)
+
+		dir := path.Dir(fullPattern)
+		base := path.Base(fullPattern)
+
+		entries, err := embedfs.ReadDir(dir)
+		if err != nil {
+			continue
+		}
+		for _, entry := range entries {
+			if entry.IsDir() {
+				continue
+			}
+			if entry.Name() == base {
+				L.PushString(path.Join(dir, entry.Name()))
+				return 1
+			}
+		}
+	}
+	return 0
 }

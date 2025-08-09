@@ -147,6 +147,7 @@ local function spawn(t)
   ltask.syscall(address, "init", {
     initfunc = t.initfunc or config.initfunc,
     name = t.name,
+    builtin = t.builtin or false,
     args = t.args or {},
   })
   return address
