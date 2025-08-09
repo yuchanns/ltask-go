@@ -3,7 +3,6 @@ module go.yuchanns.xyz/ltask
 go 1.24.5
 
 require (
-	github.com/iancoleman/strcase v0.3.0
 	github.com/phuslu/log v1.0.119
 	github.com/smasher164/mem v0.0.0-20200311200026-6e9ed23f934d
 	github.com/stretchr/testify v1.10.0
