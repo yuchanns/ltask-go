@@ -125,6 +125,7 @@ func ltaskEventInit(L *lua.State) int {
 	}
 	s.task.services.initSockevent(s.id, index)
 	fd := event.fd()
+	// Supress the warning about unsafe.Pointer conversion
 	L.PushLightUserData(*(*unsafe.Pointer)(unsafe.Pointer(&fd)))
 	return 2
 }

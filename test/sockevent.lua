@@ -4,7 +4,7 @@ local waitfunc, fd = ltask.eventinit()
 print("Event fd =", fd)
 
 ltask.idle_handler(function()
-  -- print("Idle")
+  print("Idle")
   waitfunc()
 end)
 

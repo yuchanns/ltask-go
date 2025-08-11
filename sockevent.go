@@ -5,6 +5,9 @@ import (
 	"os"
 	"runtime"
 	"sync/atomic"
+	"syscall"
+
+	"github.com/phuslu/log"
 )
 
 const (
@@ -57,31 +60,37 @@ func (s *sockEvent) open() (ok bool) {
 
 	writeConn, err := net.Dial(listener.Addr().Network(), addr.String())
 	if err != nil {
+		log.Debug().Msgf("sockEvent: dial %s failed: %v", addr.String(), err)
 		return
 	}
+	defer writeConn.Close()
 	runtime.SetFinalizer(writeConn, nil)
 
 	var readConn net.Conn
 	select {
 	case readConn = <-connChan:
+		defer readConn.Close()
 	case err = <-errChan:
-		writeConn.Close()
+		log.Debug().Msgf("sockEvent: accept %s failed: %v", addr.String(), err)
 		return
 	}
-	runtime.SetFinalizer(readConn, nil)
 
 	if tcpConn, ok := writeConn.(*net.TCPConn); ok {
 		tcpConn.SetNoDelay(true)
 		tcpConn.SetKeepAlive(false)
 		if file, err := tcpConn.File(); err == nil {
-			s.pipe[1] = int(file.Fd())
+			defer file.Close()
+			fd, _ := syscall.Dup(int(file.Fd()))
+			s.pipe[1] = fd
 		}
 	}
 	if tcpConn, ok := readConn.(*net.TCPConn); ok {
 		tcpConn.SetNoDelay(true)
 		tcpConn.SetKeepAlive(false)
 		if file, err := tcpConn.File(); err == nil {
-			s.pipe[0] = int(file.Fd())
+			defer file.Close()
+			fd, _ := syscall.Dup(int(file.Fd()))
+			s.pipe[0] = fd
 		}
 	}
 
@@ -121,11 +130,14 @@ func (s *sockEvent) trigger() {
 		return
 	}
 	atomic.StoreInt32(&s.e, 1)
-	file := os.NewFile(uintptr(s.pipe[1]), "netfd")
+	fd, _ := syscall.Dup(s.pipe[1])
+	file := os.NewFile(uintptr(fd), "netfd")
+	defer file.Close()
 	conn, err := net.FileConn(file)
 	if err != nil {
 		return
 	}
+	defer conn.Close()
 	_, _ = conn.Write([]byte{0})
 }
 
@@ -133,11 +145,14 @@ func (s *sockEvent) wait() (n int) {
 	if s.pipe[0] == socketInvalid {
 		return
 	}
-	file := os.NewFile(uintptr(s.pipe[0]), "netfd")
+	fd, _ := syscall.Dup(s.pipe[0])
+	file := os.NewFile(uintptr(fd), "netfd")
+	defer file.Close()
 	conn, err := net.FileConn(file)
 	if err != nil {
 		return
 	}
+	defer conn.Close()
 	n, err = conn.Read(make([]byte, 128))
 	atomic.StoreInt32(&s.e, 0)
 	return
