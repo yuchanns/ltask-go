@@ -50,6 +50,28 @@ for req, resp in ltask.parallel(tasks) do
   end
 end
 
+print(ltask.call(addr, "ping", "PONG"))
 ltask.send(addr, "exit")
+
+local function run_task(what, ti)
+  if ti > 0 then ltask.sleep(ti) end
+  return what
+end
+
+local task = {
+  { run_task, "a", 0 },
+  { run_task, "b", 0 },
+  { run_task, "c", 0 },
+  { run_task, "d", 0 },
+  { run_task, "e", 0 },
+  { run_task, "f", 0 },
+  { run_task, "g", 0 },
+  { run_task, "h", 10 },
+  { run_task, "i", 20 },
+}
+
+for req, resp in ltask.parallel(task) do
+  print(table.unpack(resp, 1, resp.n))
+end
 
 print("Bootstrap End")

@@ -36,6 +36,14 @@ function S.req(ti)
   return ti
 end
 
+function S.ping(...)
+  ltask.timeout(10, function() print(1) end)
+  ltask.timeout(20, function() print(2) end)
+  ltask.timeout(30, function() print(3) end)
+  ltask.sleep(40) -- sleep 0.4 sec
+  return "PING", ...
+end
+
 local task_queue = {}
 
 local function add_task(f, ...)
