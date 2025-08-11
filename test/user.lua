@@ -1,4 +1,5 @@
 local ltask = require("ltask")
+local coroutine = require("test.coroutine") -- Use coroutine wrap instead of strandard coroutine api
 
 local S = setmetatable({}, { __gc = function() print("User exit") end })
 
@@ -12,16 +13,15 @@ local function coroutine_test()
   return "Coroutine end"
 end
 
--- FIXME: Why the creation of coroutine raises root init_receipt error?
--- local co = coroutine.create(coroutine_test)
--- while true do
---   local ok, ret = coroutine.resume(co)
---   if ok then
---     print(ret)
---   else
---     break
---   end
--- end
+local co = coroutine.create(coroutine_test)
+while true do
+  local ok, ret = coroutine.resume(co)
+  if ok then
+    print(ret)
+  else
+    break
+  end
+end
 
 function S.wait(ti)
   if ti < 10 then error("Error : " .. ti) end
