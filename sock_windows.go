@@ -3,6 +3,7 @@
 package ltask
 
 import (
+	"fmt"
 	"net"
 	"unsafe"
 
@@ -33,44 +34,61 @@ func fdDup(fd int) (int, error) {
 }
 
 var (
-	ws2_32DLL = windows.NewLazySystemDLL("ws2_32.dll")
-	procSend  = ws2_32DLL.NewProc("send")
-	procRecv  = ws2_32DLL.NewProc("recv")
-	procClose = ws2_32DLL.NewProc("closesocket")
+	ws2_32DLL           = windows.NewLazySystemDLL("ws2_32.dll")
+	procSend            = ws2_32DLL.NewProc("send")
+	procRecv            = ws2_32DLL.NewProc("recv")
+	procClose           = ws2_32DLL.NewProc("closesocket")
+	procWSAGetLastError = ws2_32DLL.NewProc("WSAGetLastError")
 )
 
 func send(fd int, buf []byte, flags int) (n int, err error) {
-	r1, _, err := procSend.Call(
+	if len(buf) == 0 {
+		return 0, nil
+	}
+
+	r1, _, _ := procSend.Call(
 		uintptr(fd),
 		uintptr(unsafe.Pointer(&buf[0])),
 		uintptr(len(buf)),
 		uintptr(flags),
 	)
-	if err != nil {
-		return
+
+	if r1 == uintptr(0xFFFFFFFF) { // SOCKET_ERROR
+		errno, _, _ := procWSAGetLastError.Call()
+		return 0, fmt.Errorf("send failed with error: %d", errno)
 	}
-	n = int(r1)
-	return
+
+	return int(r1), nil
 }
 
 func recv(fd int, buf []byte, flags int) (n int, err error) {
-	r1, _, err := procRecv.Call(
+	if len(buf) == 0 {
+		return 0, nil
+	}
+
+	r1, _, _ := procRecv.Call(
 		uintptr(fd),
 		uintptr(unsafe.Pointer(&buf[0])),
 		uintptr(len(buf)),
 		uintptr(flags),
 	)
-	if err != nil {
-		return
+
+	if r1 == uintptr(0xFFFFFFFF) { // SOCKET_ERROR
+		errno, _, _ := procWSAGetLastError.Call()
+		if errno == 10035 { // WSAEWOULDBLOCK
+			return 0, nil
+		}
+		return 0, fmt.Errorf("recv failed with error: %d", errno)
 	}
-	n = int(r1)
-	return
+
+	return int(r1), nil
 }
 
-func closeSocket(fd int) (err error) {
-	r1, _, err := procClose.Call(uintptr(fd))
+func closeSocket(fd int) error {
+	r1, _, _ := procClose.Call(uintptr(fd))
 	if r1 != 0 {
-		return err
+		errno, _, _ := procWSAGetLastError.Call()
+		return fmt.Errorf("closesocket failed with error: %d", errno)
 	}
 	return nil
 }
@@ -101,14 +119,9 @@ func (c *conn) close() {
 }
 
 func (c *conn) write(b []byte) (n int, err error) {
-	n, err = send(int(c.handle), b, 0)
-	return
+	return send(int(c.handle), b, 0)
 }
 
 func (c *conn) read(b []byte) (n int, err error) {
-	n, err = recv(int(c.handle), b, 0)
-	if err == windows.ERROR_MORE_DATA {
-		err = nil
-	}
-	return
+	return recv(int(c.handle), b, 0)
 }
