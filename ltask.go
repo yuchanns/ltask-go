@@ -31,19 +31,17 @@ func init() {
 	}
 }
 
-var luaLib *lua.Lib
-
 func OpenLibs(L *lua.State, lib *lua.Lib) {
 	_ = L.GetGlobal("package")
 	_, _ = L.GetField(-1, "preload")
 
+	L.PushLightUserData(lib)
+
 	l := []*lua.Reg{
 		{Name: "ltask.bootstrap", Func: ltaskBootstrapOpen},
 	}
-	L.SetFuncs(l, 0)
+	L.SetFuncs(l, 1)
 	L.Pop(2)
-
-	luaLib = lib
 }
 
 func ltaskOpen(L *lua.State) int {
@@ -247,6 +245,7 @@ func ltaskPopLog(L *lua.State) int {
 }
 
 type ltask struct {
+	luaLib              *lua.Lib
 	config              *ltaskConfig
 	workers             []workerThread
 	eventInit           [maxSockEvent]atomicInt
@@ -282,7 +281,7 @@ func (task *ltask) pushLog(id serviceId, data unsafe.Pointer, sz int64) (ok bool
 	})
 }
 
-func (task *ltask) init(L *lua.State, config *ltaskConfig) {
+func (task *ltask) init(L *lua.State, config *ltaskConfig, luaLib *lua.Lib) {
 	task = (*ltask)(L.NewUserDataUv(int(unsafe.Sizeof(*task)), 0))
 	L.SetField(lua.LUA_REGISTRYINDEX, "LTASK_GLOBAL")
 	task.lqueue = newLogQueue()
@@ -293,10 +292,11 @@ func (task *ltask) init(L *lua.State, config *ltaskConfig) {
 	task.services = newServicePool(config)
 	ptr := malloc.Alloc(uint(xxchan.Sizeof[int](int(config.maxService))))
 	task.schedule = xxchan.Make[int](ptr, int(config.maxService))
-	// Windows compatiblity: initialize the timer with a nil value
-	// to clear any wired data in the memory.
 	task.timer = nil
 	task.externalMessage = nil
+	// luaLib is guaranteed to be alive during the lifetime of task
+	// so it is safe to store the Go pointer here.
+	task.luaLib = luaLib
 
 	if config.externalQueue > 0 {
 		ptr := malloc.Alloc(uint(xxchan.Sizeof[unsafe.Pointer](int(config.externalQueue))))
