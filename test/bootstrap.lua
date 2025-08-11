@@ -8,6 +8,29 @@ local addr = ltask.spawn("user", "Hello")
 
 print("Spawn user", addr)
 
+-- test async
+
+local async = ltask.async()
+
+async:request(addr, "req", 30)
+async:request(addr, "req", 10)
+
+print("Waiting request 1")
+async:wait()
+print("Get request 1")
+
+async:request(addr, "req", 5)
+async:request(addr, "req", 20)
+
+print("Waiting request 2")
+async:wait()
+print("Get request 2")
+
+print("--------------")
+ltask.send(addr, "func1", "first")
+ltask.send(addr, "func2")
+ltask.send(addr, "func1", "second")
+
 --- test request
 
 local tasks = {

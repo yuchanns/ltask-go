@@ -355,6 +355,26 @@ local function send_response(...)
   session_coroutine_response[running_thread] = nil
 end
 
+local coroutine_pool = setmetatable({}, { __mode = "kv" })
+
+local function new_thread(f)
+  local co = table.remove(coroutine_pool)
+  if co == nil then
+    co = coroutine_create(function(...)
+      f(...)
+      while true do
+        f = nil
+        coroutine_pool[#coroutine_pool + 1] = co
+        f = coroutine_yield()
+        f(coroutine_yield())
+      end
+    end)
+  else
+    coroutine_resume(co, f)
+  end
+  return co
+end
+
 function ltask.suspend(session, func) session_coroutine_suspend_lookup[session] = coroutine_create(func) end
 
 function ltask.call(address, ...)
@@ -367,6 +387,64 @@ function ltask.call(address, ...)
   else
     -- type == MESSAGE_ERROR
     rethrow_error(2, ltask.unpack_remove(msg, sz))
+  end
+end
+
+do -- async object
+  local async = {}
+  async.__index = async
+
+  local function still_session(obj, session)
+    local s = obj._sessions
+    s[session] = nil
+    return next(s)
+  end
+
+  function ltask.async()
+    local obj
+    local function try_raise_error(type, msg, sz)
+      local err = ltask.unpack_remove(msg, sz)
+      if type == MESSAGE_ERROR then obj._err = err end
+    end
+    local function wait_func(type, session, msg, sz)
+      -- ignore type
+      try_raise_error(type, msg, sz)
+      while still_session(obj, session) do
+        type, session, msg, sz = yield_session()
+        try_raise_error(type, msg, sz)
+      end
+
+      if obj._wakeup then ltask.wakeup(obj._wakeup) end
+      return wait_func(yield_session())
+    end
+
+    obj = {
+      _sessions = {},
+      _wait = new_thread(wait_func),
+    }
+    return setmetatable(obj, async)
+  end
+
+  function async:request(address, ...)
+    post_request_message(address, session_id, MESSAGE_REQUEST, ltask.pack(...))
+    session_coroutine_suspend_lookup[session_id] = self._wait
+    self._sessions[session_id] = true
+    session_id = session_id + 1
+  end
+
+  function async:wait()
+    if next(self._sessions) then
+      if not self._wakeup then
+        self._wakeup = self
+        ltask.wait(self)
+      end
+    end
+    local err = self._err
+    if err ~= nil then
+      self._err = nil
+      rethrow_error(2, err)
+    end
+    self._wakeup = nil
   end
 end
 
@@ -559,26 +637,6 @@ local function wakeup_session(co, ...)
     yield_service()
     cont = resume_session(co)
   end
-end
-
-local coroutine_pool = setmetatable({}, { __mode = "kv" })
-
-local function new_thread(f)
-  local co = table.remove(coroutine_pool)
-  if co == nil then
-    co = coroutine_create(function(...)
-      f(...)
-      while true do
-        f = nil
-        coroutine_pool[#coroutine_pool + 1] = co
-        f = coroutine_yield()
-        f(coroutine_yield())
-      end
-    end)
-  else
-    coroutine_resume(co, f)
-  end
-  return co
 end
 
 function ltask.timeout(ti, func)
