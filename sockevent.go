@@ -2,7 +2,6 @@ package ltask
 
 import (
 	"net"
-	"os"
 	"runtime"
 	"sync/atomic"
 
@@ -77,20 +76,12 @@ func (s *sockEvent) open() (ok bool) {
 	if tcpConn, ok := writeConn.(*net.TCPConn); ok {
 		tcpConn.SetNoDelay(true)
 		tcpConn.SetKeepAlive(false)
-		if file, err := tcpConn.File(); err == nil {
-			defer file.Close()
-			fd, _ := fdDup(int(file.Fd()))
-			s.pipe[1] = fd
-		}
+		s.pipe[1], _ = fdGet(tcpConn)
 	}
 	if tcpConn, ok := readConn.(*net.TCPConn); ok {
 		tcpConn.SetNoDelay(true)
 		tcpConn.SetKeepAlive(false)
-		if file, err := tcpConn.File(); err == nil {
-			defer file.Close()
-			fd, _ := fdDup(int(file.Fd()))
-			s.pipe[0] = fd
-		}
+		s.pipe[0], _ = fdGet(tcpConn)
 	}
 
 	_, err = writeConn.Write([]byte{0})
@@ -104,20 +95,16 @@ func (s *sockEvent) open() (ok bool) {
 
 func (s *sockEvent) close() {
 	if s.pipe[0] != socketInvalid {
-		file := os.NewFile(uintptr(s.pipe[0]), "netfd")
-		conn, err := net.FileConn(file)
-		if err != nil {
-			return
+		conn, err := newConn(s.pipe[0])
+		if err == nil {
+			conn.close()
 		}
-		conn.Close()
 	}
 	if s.pipe[1] != socketInvalid {
-		file := os.NewFile(uintptr(s.pipe[1]), "netfd")
-		conn, err := net.FileConn(file)
-		if err != nil {
-			return
+		conn, err := newConn(s.pipe[1])
+		if err == nil {
+			conn.close()
 		}
-		conn.Close()
 	}
 }
 
@@ -130,14 +117,12 @@ func (s *sockEvent) trigger() {
 	}
 	atomic.StoreInt32(&s.e, 1)
 	fd, _ := fdDup(s.pipe[1])
-	file := os.NewFile(uintptr(fd), "netfd")
-	defer file.Close()
-	conn, err := net.FileConn(file)
+	conn, err := newConn(fd)
 	if err != nil {
 		return
 	}
-	defer conn.Close()
-	_, _ = conn.Write([]byte{0})
+	defer conn.close()
+	_, _ = conn.write([]byte{0})
 }
 
 func (s *sockEvent) wait() (n int) {
@@ -145,14 +130,12 @@ func (s *sockEvent) wait() (n int) {
 		return
 	}
 	fd, _ := fdDup(s.pipe[0])
-	file := os.NewFile(uintptr(fd), "netfd")
-	defer file.Close()
-	conn, err := net.FileConn(file)
+	conn, err := newConn(fd)
 	if err != nil {
 		return
 	}
-	defer conn.Close()
-	n, err = conn.Read(make([]byte, 128))
+	defer conn.close()
+	n, err = conn.read(make([]byte, 128))
 	atomic.StoreInt32(&s.e, 0)
 	return
 }
