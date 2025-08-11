@@ -1,6 +1,7 @@
 package ltask
 
 import (
+	"fmt"
 	"net"
 	"runtime"
 	"sync/atomic"
@@ -77,6 +78,11 @@ func (s *sockEvent) open() (ok bool) {
 		tcpConn.SetNoDelay(true)
 		tcpConn.SetKeepAlive(false)
 		s.pipe[1], _ = fdGet(tcpConn)
+		conn, err := newConn(s.pipe[1]) // ensure the fd is valid
+		if err != nil {
+			fmt.Println("sockEvent: newConn failed:", err)
+		}
+		fmt.Println(conn.write([]byte{0}))
 	}
 	if tcpConn, ok := readConn.(*net.TCPConn); ok {
 		tcpConn.SetNoDelay(true)
