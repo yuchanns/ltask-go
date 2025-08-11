@@ -170,7 +170,12 @@ func (task *ltask) checkMessageTo(to serviceId) {
 		task.scheduleBack(to)
 		return
 	}
-	// TODO: trigger sockevent of service
+	sockId := task.services.getSockevent(to)
+	if sockId < 0 {
+		return
+	}
+	log.Debug().Msgf("Trigger sockevent of service %d", to)
+	task.event[sockId].trigger()
 }
 
 func (task *ltask) scheduleBack(id serviceId) {

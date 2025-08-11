@@ -55,7 +55,11 @@ func ltaskCloseService(L *lua.State) int {
 	if s.task.services.getStatus(id) != serviceStatusDead {
 		return L.Errorf("Hang %d before close it", id)
 	}
-	// TODO: close sock event
+	sockId := s.task.services.getSockevent(id)
+	if sockId >= 0 {
+		s.task.event[sockId].close()
+		atomic.StoreInt32(&s.task.eventInit[sockId], 0)
+	}
 	ret := s.task.services.closeServiceMessages(L, id)
 	s.task.services.deleteService(id)
 	return ret

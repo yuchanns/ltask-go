@@ -284,11 +284,7 @@ func ltaskWait(L *lua.State) int {
 
 	ctx.task.lqueue.delete()
 	for i := range ctx.task.event {
-		for ctx.task.event[i].Len() > 0 {
-			ctx.task.event[i].Pop()
-		}
-		malloc.Free(unsafe.Pointer(ctx.task.event[i]))
-		ctx.task.event[i] = nil
+		ctx.task.event[i].close()
 	}
 
 	ctx.task.externalLastMessage = nil

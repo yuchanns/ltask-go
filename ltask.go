@@ -100,6 +100,13 @@ func ltaskSleep(L *lua.State) int {
 	return 0
 }
 
+func ltaskEventWait(L *lua.State) int {
+	event := (*sockEvent)(L.ToUserData(L.UpValueIndex(1)))
+	r := event.wait()
+	L.PushBoolean(r > 0)
+	return 1
+}
+
 func ltaskEventInit(L *lua.State) int {
 	s := getS(L)
 	index := s.task.services.getSockevent(s.id)
@@ -110,9 +117,16 @@ func ltaskEventInit(L *lua.State) int {
 	if index < 0 {
 		return L.Errorf("Too many sockevents")
 	}
-	// TODO: open sockevents
+	event := &s.task.event[index]
+	L.PushLightUserData(event)
+	L.PushGoClousure(ltaskEventWait, 1)
+	if !event.open() {
+		return L.Errorf("Create sockevent fail")
+	}
 	s.task.services.initSockevent(s.id, index)
-	return 0
+	fd := event.fd()
+	L.PushLightUserData(*(*unsafe.Pointer)(unsafe.Pointer(&fd)))
+	return 2
 }
 
 func ltaskTimerAdd(L *lua.State) int {
@@ -249,7 +263,7 @@ type ltask struct {
 	config              *ltaskConfig
 	workers             []workerThread
 	eventInit           [maxSockEvent]atomicInt
-	event               [maxSockEvent]*xxchan.Channel[struct{}]
+	event               [maxSockEvent]sockEvent
 	services            *servicePool
 	schedule            *xxchan.Channel[int]
 	timer               *timefall.Timer[timerEvent]
@@ -318,9 +332,7 @@ func (task *ltask) init(L *lua.State, config *ltaskConfig, luaLib *lua.Lib) {
 	atomic.StoreInt32(&task.threadCount, 0)
 
 	for i := range task.event {
-		ptr := malloc.Alloc(uint(xxchan.Sizeof[struct{}](1)))
-		ch := xxchan.Make[struct{}](ptr, 1)
-		task.event[i] = ch
+		task.event[i].init()
 		atomic.StoreInt32(&task.eventInit[i], 0)
 	}
 }
