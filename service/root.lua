@@ -179,7 +179,7 @@ local function del_service(address)
   if anonymous_services[address] then
     anonymous_services[address] = nil
   else
-    for _, name in ipairs[named_services] do
+    for _, name in ipairs(named_services) do
       if named_services[name] == address then break end
     end
   end

@@ -16,10 +16,10 @@ start({
       unique = true,
       builtin = true,
     },
-    -- {
-    -- 	name = "sockevent",
-    -- 	unique = true,
-    -- },
+    {
+      name = "sockevent",
+      unique = true,
+    },
     {
       name = "bootstrap",
     },

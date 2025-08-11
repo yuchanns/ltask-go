@@ -50,6 +50,9 @@ for req, resp in ltask.parallel(tasks) do
   end
 end
 
+local se = ltask.queryservice("sockevent")
+print("PING sockevent", se)
+print(ltask.call(se, "ping", "PONG"))
 print(ltask.call(addr, "ping", "PONG"))
 ltask.send(addr, "exit")
 
