@@ -5,7 +5,6 @@ import (
 	"os"
 	"runtime"
 	"sync/atomic"
-	"syscall"
 
 	"github.com/phuslu/log"
 )
@@ -80,7 +79,7 @@ func (s *sockEvent) open() (ok bool) {
 		tcpConn.SetKeepAlive(false)
 		if file, err := tcpConn.File(); err == nil {
 			defer file.Close()
-			fd, _ := syscall.Dup(int(file.Fd()))
+			fd, _ := fdDup(int(file.Fd()))
 			s.pipe[1] = fd
 		}
 	}
@@ -89,7 +88,7 @@ func (s *sockEvent) open() (ok bool) {
 		tcpConn.SetKeepAlive(false)
 		if file, err := tcpConn.File(); err == nil {
 			defer file.Close()
-			fd, _ := syscall.Dup(int(file.Fd()))
+			fd, _ := fdDup(int(file.Fd()))
 			s.pipe[0] = fd
 		}
 	}
@@ -130,7 +129,7 @@ func (s *sockEvent) trigger() {
 		return
 	}
 	atomic.StoreInt32(&s.e, 1)
-	fd, _ := syscall.Dup(s.pipe[1])
+	fd, _ := fdDup(s.pipe[1])
 	file := os.NewFile(uintptr(fd), "netfd")
 	defer file.Close()
 	conn, err := net.FileConn(file)
@@ -145,7 +144,7 @@ func (s *sockEvent) wait() (n int) {
 	if s.pipe[0] == socketInvalid {
 		return
 	}
-	fd, _ := syscall.Dup(s.pipe[0])
+	fd, _ := fdDup(s.pipe[0])
 	file := os.NewFile(uintptr(fd), "netfd")
 	defer file.Close()
 	conn, err := net.FileConn(file)
