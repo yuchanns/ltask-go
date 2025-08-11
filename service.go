@@ -401,6 +401,14 @@ func (p *servicePool) newService(sid serviceId) (svcId serviceId) {
 	return
 }
 
+func (p *servicePool) setBindingThread(id serviceId, thread int32) {
+	s := p.getService(id)
+	if s == nil {
+		return
+	}
+	s.bindingThread = thread
+}
+
 func (p *servicePool) getBindingThread(id serviceId) (thread int32) {
 	s := p.getService(id)
 	if s == nil {

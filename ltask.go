@@ -64,6 +64,8 @@ func ltaskOpen(L *lua.State) int {
 		{Name: "recv_message", Func: lrecvMessage},
 		{Name: "message_receipt", Func: lmessageReceipt},
 		{Name: "self", Func: lself},
+		{Name: "worker_id", Func: lworkerId},
+		{Name: "worker_bind", Func: lworkerBind},
 		{Name: "timer_add", Func: ltaskTimerAdd},
 		{Name: "timer_update", Func: ltaskTimerUpdate},
 		{Name: "now", Func: ltaskNow},
@@ -180,6 +182,31 @@ func lself(L *lua.State) int {
 	s := getS(L)
 	L.PushInteger(int64(s.id))
 	return 1
+}
+
+func lworkerId(L *lua.State) int {
+	s := getS(L)
+	worker := s.task.getWorkerId(s.id)
+	if worker >= 0 {
+		L.PushInteger(int64(worker))
+		return 1
+	}
+	return 0
+}
+
+func lworkerBind(L *lua.State) int {
+	s := getS(L)
+	if L.IsNoneOrNil(1) {
+		// unbind
+		s.task.services.setBindingThread(s.id, threadNone)
+		return 0
+	}
+	worker := L.CheckInteger(1)
+	if worker < 0 || worker >= int64(len(s.task.workers)) {
+		return L.Errorf("Invalid worker id: %d", worker)
+	}
+	s.task.services.setBindingThread(s.id, int32(worker))
+	return 0
 }
 
 func ltaskLabel(L *lua.State) int {

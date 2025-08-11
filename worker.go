@@ -405,6 +405,15 @@ func (task *ltask) dispatchOutMessage(id serviceId, msg *message) {
 	task.checkMessageTo(msg.to)
 }
 
+func (task *ltask) getWorkerId(id serviceId) (workerId int) {
+	for i := range task.workers {
+		if task.workers[i].running == id {
+			return i
+		}
+	}
+	return -1
+}
+
 func (w *workerThread) doneJob() (job serviceId) {
 	done := w.serviceDone
 	// We do not need CAS here as it is guaranteed that
