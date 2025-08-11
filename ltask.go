@@ -207,8 +207,12 @@ func ltaskPopLog(L *lua.State) int {
 	if !ok {
 		return 0
 	}
-	// TODO: timer_starttime
-	L.PushInteger(m.timestamp)
+	start := int64(0)
+	t := s.task.timer
+	if t != nil {
+		start = t.Start() * 100
+	}
+	L.PushInteger(m.timestamp + start)
 	L.PushInteger(int64(m.id))
 	L.PushLightUserData(m.msg)
 	L.PushInteger(m.sz)
@@ -243,16 +247,11 @@ func (task *ltask) allocSockevent() (index int) {
 }
 
 func (task *ltask) pushLog(id serviceId, data unsafe.Pointer, sz int64) (ok bool) {
-	now := time.Now()
-	sec := now.Unix()
-	nsec := now.Nanosecond()
-	csec := sec*100 + int64(nsec/10_000_000)
 	return task.lqueue.push(&logMessage{
-		id:  id,
-		msg: data,
-		sz:  sz,
-		// TODO: use timer_now
-		timestamp: csec,
+		id:        id,
+		msg:       data,
+		sz:        sz,
+		timestamp: task.timer.Now(),
 	})
 }
 
