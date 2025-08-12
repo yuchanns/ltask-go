@@ -4,8 +4,9 @@ package ltask
 
 import (
 	"net"
-	"os"
 	"syscall"
+
+	"golang.org/x/sys/unix"
 )
 
 func fdDup(fd int) (int, error) {
@@ -23,29 +24,25 @@ func fdGet(tcpConn *net.TCPConn) (fd int, err error) {
 }
 
 type conn struct {
-	conn net.Conn
-	file *os.File
+	fd int
 }
 
-func newConn(fd int) (*conn, error) {
-	file := os.NewFile(uintptr(fd), "netfd")
-	con, err := net.FileConn(file)
+func newConn(fd int) *conn {
 	return &conn{
-		conn: con,
-		file: file,
-	}, err
+		fd: fd,
+	}
 }
 
 func (c *conn) close() {
-	c.conn.Close()
+	unix.Close(c.fd)
 }
 
 func (c *conn) write(b []byte) (n int, err error) {
-	n, err = c.conn.Write(b)
+	n, err = unix.Write(c.fd, b)
 	return
 }
 
 func (c *conn) read(b []byte) (n int, err error) {
-	n, err = c.conn.Read(b)
+	n, err = unix.Read(c.fd, b)
 	return
 }

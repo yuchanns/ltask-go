@@ -108,10 +108,10 @@ type conn struct {
 	handle windows.Handle
 }
 
-func newConn(handle int) (*conn, error) {
+func newConn(handle int) *conn {
 	return &conn{
 		handle: windows.Handle(handle),
-	}, nil
+	}
 }
 
 func (c *conn) close() {

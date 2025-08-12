@@ -93,16 +93,12 @@ func (s *sockEvent) open() (ok bool) {
 
 func (s *sockEvent) close() {
 	if s.pipe[0] != socketInvalid {
-		conn, err := newConn(s.pipe[0])
-		if err == nil {
-			conn.close()
-		}
+		conn := newConn(s.pipe[0])
+		conn.close()
 	}
 	if s.pipe[1] != socketInvalid {
-		conn, err := newConn(s.pipe[1])
-		if err == nil {
-			conn.close()
-		}
+		conn := newConn(s.pipe[1])
+		conn.close()
 	}
 }
 
@@ -114,12 +110,7 @@ func (s *sockEvent) trigger() {
 		return
 	}
 	atomic.StoreInt32(&s.e, 1)
-	fd, _ := fdDup(s.pipe[1])
-	conn, err := newConn(fd)
-	if err != nil {
-		return
-	}
-	defer conn.close()
+	conn := newConn(s.pipe[1])
 	_, _ = conn.write([]byte{0})
 }
 
@@ -127,13 +118,11 @@ func (s *sockEvent) wait() (n int) {
 	if s.pipe[0] == socketInvalid {
 		return
 	}
-	fd, _ := fdDup(s.pipe[0])
-	conn, err := newConn(fd)
+	conn := newConn(s.pipe[0])
+	n, err := conn.read(make([]byte, 128))
 	if err != nil {
-		return
+		log.Debug().Msgf("sockEvent: read from pipe failed: %v", err)
 	}
-	defer conn.close()
-	n, err = conn.read(make([]byte, 128))
 	atomic.StoreInt32(&s.e, 0)
 	return
 }
