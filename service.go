@@ -54,7 +54,7 @@ type service struct {
 	clock         uint64
 }
 
-func (s *service) init(ud *serviceUd, queueLen int64, pL *lua.State) (ok bool) {
+func (s *service) init(luaLib *lua.Lib, ud *serviceUd, queueLen int64, pL *lua.State) (ok bool) {
 	// TODO: compatible 505
 	// malloc
 	L, err := luaLib.NewState()
@@ -170,7 +170,12 @@ func (task *ltask) checkMessageTo(to serviceId) {
 		task.scheduleBack(to)
 		return
 	}
-	// TODO: trigger sockevent of service
+	sockId := task.services.getSockevent(to)
+	if sockId < 0 {
+		return
+	}
+	log.Debug().Msgf("Trigger sockevent of service %d", to)
+	task.event[sockId].trigger()
 }
 
 func (task *ltask) scheduleBack(id serviceId) {
@@ -401,6 +406,14 @@ func (p *servicePool) newService(sid serviceId) (svcId serviceId) {
 	return
 }
 
+func (p *servicePool) setBindingThread(id serviceId, thread int32) {
+	s := p.getService(id)
+	if s == nil {
+		return
+	}
+	s.bindingThread = thread
+}
+
 func (p *servicePool) getBindingThread(id serviceId) (thread int32) {
 	s := p.getService(id)
 	if s == nil {
@@ -524,7 +537,7 @@ func (task *ltask) initService(L *lua.State, id serviceId, label string,
 			task.services.deleteService(id)
 		}
 	}()
-	if !s.init(ud, task.services.queueLen, L) || !s.requiref("ltask", ltaskOpen, L) {
+	if !s.init(task.luaLib, ud, task.services.queueLen, L) || !s.requiref("ltask", ltaskOpen, L) {
 		L.PushString(fmt.Sprintf("New service fail: %s", getErrorMessage(L)))
 		return
 	}

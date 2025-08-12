@@ -52,7 +52,8 @@ func ltaskInit(L *lua.State) int {
 	}
 
 	var task *ltask
-	task.init(L, config)
+	luaLib := (*lua.Lib)(L.ToUserData(L.UpValueIndex(1)))
+	task.init(L, config, luaLib)
 
 	return 1
 }
@@ -283,11 +284,7 @@ func ltaskWait(L *lua.State) int {
 
 	ctx.task.lqueue.delete()
 	for i := range ctx.task.event {
-		for ctx.task.event[i].Len() > 0 {
-			ctx.task.event[i].Pop()
-		}
-		malloc.Free(unsafe.Pointer(ctx.task.event[i]))
-		ctx.task.event[i] = nil
+		ctx.task.event[i].close()
 	}
 
 	ctx.task.externalLastMessage = nil
@@ -333,7 +330,6 @@ func ltaskBootstrapOpen(L *lua.State) int {
 		{Name: "readfile", Func: ltaskReadFile},
 		{Name: "loadfile", Func: ltaskLoadFile},
 		{Name: "dofile", Func: ltaskDoFile},
-		{Name: "init", Func: ltaskInit},
 		{Name: "deinit", Func: ltaskDeinit},
 		{Name: "run", Func: ltaskRun},
 		{Name: "wait", Func: ltaskWait},
@@ -350,5 +346,11 @@ func ltaskBootstrapOpen(L *lua.State) int {
 	}
 
 	L.NewLib(l)
+
+	L.PushLightUserData(L.ToUserData(L.UpValueIndex(1)))
+	l2 := []*lua.Reg{
+		{Name: "init", Func: ltaskInit},
+	}
+	L.SetFuncs(l2, 1)
 	return 1
 }

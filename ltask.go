@@ -31,19 +31,17 @@ func init() {
 	}
 }
 
-var luaLib *lua.Lib
-
 func OpenLibs(L *lua.State, lib *lua.Lib) {
 	_ = L.GetGlobal("package")
 	_, _ = L.GetField(-1, "preload")
 
+	L.PushLightUserData(lib)
+
 	l := []*lua.Reg{
 		{Name: "ltask.bootstrap", Func: ltaskBootstrapOpen},
 	}
-	L.SetFuncs(l, 0)
+	L.SetFuncs(l, 1)
 	L.Pop(2)
-
-	luaLib = lib
 }
 
 func ltaskOpen(L *lua.State) int {
@@ -64,6 +62,8 @@ func ltaskOpen(L *lua.State) int {
 		{Name: "recv_message", Func: lrecvMessage},
 		{Name: "message_receipt", Func: lmessageReceipt},
 		{Name: "self", Func: lself},
+		{Name: "worker_id", Func: lworkerId},
+		{Name: "worker_bind", Func: lworkerBind},
 		{Name: "timer_add", Func: ltaskTimerAdd},
 		{Name: "timer_update", Func: ltaskTimerUpdate},
 		{Name: "now", Func: ltaskNow},
@@ -100,6 +100,13 @@ func ltaskSleep(L *lua.State) int {
 	return 0
 }
 
+func ltaskEventWait(L *lua.State) int {
+	event := (*sockEvent)(L.ToUserData(L.UpValueIndex(1)))
+	r := event.wait()
+	L.PushBoolean(r > 0)
+	return 1
+}
+
 func ltaskEventInit(L *lua.State) int {
 	s := getS(L)
 	index := s.task.services.getSockevent(s.id)
@@ -110,9 +117,17 @@ func ltaskEventInit(L *lua.State) int {
 	if index < 0 {
 		return L.Errorf("Too many sockevents")
 	}
-	// TODO: open sockevents
+	event := &s.task.event[index]
+	L.PushLightUserData(event)
+	L.PushGoClousure(ltaskEventWait, 1)
+	if !event.open() {
+		return L.Errorf("Create sockevent fail")
+	}
 	s.task.services.initSockevent(s.id, index)
-	return 0
+	fd := event.fd()
+	// Supress the warning about unsafe.Pointer conversion
+	L.PushLightUserData(*(*unsafe.Pointer)(unsafe.Pointer(&fd)))
+	return 2
 }
 
 func ltaskTimerAdd(L *lua.State) int {
@@ -182,6 +197,31 @@ func lself(L *lua.State) int {
 	return 1
 }
 
+func lworkerId(L *lua.State) int {
+	s := getS(L)
+	worker := s.task.getWorkerId(s.id)
+	if worker >= 0 {
+		L.PushInteger(int64(worker))
+		return 1
+	}
+	return 0
+}
+
+func lworkerBind(L *lua.State) int {
+	s := getS(L)
+	if L.IsNoneOrNil(1) {
+		// unbind
+		s.task.services.setBindingThread(s.id, threadNone)
+		return 0
+	}
+	worker := L.CheckInteger(1)
+	if worker < 0 || worker >= int64(len(s.task.workers)) {
+		return L.Errorf("Invalid worker id: %d", worker)
+	}
+	s.task.services.setBindingThread(s.id, int32(worker))
+	return 0
+}
+
 func ltaskLabel(L *lua.State) int {
 	s := getS(L)
 	label := s.task.services.getLabel(s.id)
@@ -207,8 +247,12 @@ func ltaskPopLog(L *lua.State) int {
 	if !ok {
 		return 0
 	}
-	// TODO: timer_starttime
-	L.PushInteger(m.timestamp)
+	start := int64(0)
+	t := s.task.timer
+	if t != nil {
+		start = t.Start() * 100
+	}
+	L.PushInteger(m.timestamp + start)
 	L.PushInteger(int64(m.id))
 	L.PushLightUserData(m.msg)
 	L.PushInteger(m.sz)
@@ -216,10 +260,11 @@ func ltaskPopLog(L *lua.State) int {
 }
 
 type ltask struct {
+	luaLib              *lua.Lib
 	config              *ltaskConfig
 	workers             []workerThread
 	eventInit           [maxSockEvent]atomicInt
-	event               [maxSockEvent]*xxchan.Channel[struct{}]
+	event               [maxSockEvent]sockEvent
 	services            *servicePool
 	schedule            *xxchan.Channel[int]
 	timer               *timefall.Timer[timerEvent]
@@ -243,20 +288,15 @@ func (task *ltask) allocSockevent() (index int) {
 }
 
 func (task *ltask) pushLog(id serviceId, data unsafe.Pointer, sz int64) (ok bool) {
-	now := time.Now()
-	sec := now.Unix()
-	nsec := now.Nanosecond()
-	csec := sec*100 + int64(nsec/10_000_000)
 	return task.lqueue.push(&logMessage{
-		id:  id,
-		msg: data,
-		sz:  sz,
-		// TODO: use timer_now
-		timestamp: csec,
+		id:        id,
+		msg:       data,
+		sz:        sz,
+		timestamp: task.timer.Now(),
 	})
 }
 
-func (task *ltask) init(L *lua.State, config *ltaskConfig) {
+func (task *ltask) init(L *lua.State, config *ltaskConfig, luaLib *lua.Lib) {
 	task = (*ltask)(L.NewUserDataUv(int(unsafe.Sizeof(*task)), 0))
 	L.SetField(lua.LUA_REGISTRYINDEX, "LTASK_GLOBAL")
 	task.lqueue = newLogQueue()
@@ -267,10 +307,11 @@ func (task *ltask) init(L *lua.State, config *ltaskConfig) {
 	task.services = newServicePool(config)
 	ptr := malloc.Alloc(uint(xxchan.Sizeof[int](int(config.maxService))))
 	task.schedule = xxchan.Make[int](ptr, int(config.maxService))
-	// Windows compatiblity: initialize the timer with a nil value
-	// to clear any wired data in the memory.
 	task.timer = nil
 	task.externalMessage = nil
+	// luaLib is guaranteed to be alive during the lifetime of task
+	// so it is safe to store the Go pointer here.
+	task.luaLib = luaLib
 
 	if config.externalQueue > 0 {
 		ptr := malloc.Alloc(uint(xxchan.Sizeof[unsafe.Pointer](int(config.externalQueue))))
@@ -292,9 +333,7 @@ func (task *ltask) init(L *lua.State, config *ltaskConfig) {
 	atomic.StoreInt32(&task.threadCount, 0)
 
 	for i := range task.event {
-		ptr := malloc.Alloc(uint(xxchan.Sizeof[struct{}](1)))
-		ch := xxchan.Make[struct{}](ptr, 1)
-		task.event[i] = ch
+		task.event[i].init()
 		atomic.StoreInt32(&task.eventInit[i], 0)
 	}
 }

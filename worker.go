@@ -131,6 +131,12 @@ func (task *ltask) quitAllWorkers() {
 	}
 }
 
+func (task *ltask) triggerAllSockevent() {
+	for i := range task.event {
+		task.event[i].trigger()
+	}
+}
+
 func (task *ltask) dispatchExternalMessages() {
 	var send bool
 	if task.externalLastMessage != nil {
@@ -194,7 +200,11 @@ func (task *ltask) triggerBlockedWorkers() {
 			blocked = 1
 			continue
 		}
-		// TODO: touch service who block the waiting service
+		// touch service who block the waiting service
+		sockId := task.services.getSockevent(running)
+		if sockId >= 0 {
+			task.event[sockId].trigger()
+		}
 		w.waiting = 0
 	}
 
@@ -405,6 +415,15 @@ func (task *ltask) dispatchOutMessage(id serviceId, msg *message) {
 	task.checkMessageTo(msg.to)
 }
 
+func (task *ltask) getWorkerId(id serviceId) (workerId int) {
+	for i := range task.workers {
+		if task.workers[i].running == id {
+			return i
+		}
+	}
+	return -1
+}
+
 func (w *workerThread) doneJob() (job serviceId) {
 	done := w.serviceDone
 	// We do not need CAS here as it is guaranteed that
@@ -591,6 +610,7 @@ func (w *workerThread) start() {
 					log.Debug().Msg("Root quit")
 					// root quit, wakeup others
 					w.task.quitAllWorkers()
+					w.task.triggerAllSockevent()
 					w.task.wakeupAlWorkers()
 					break
 				}
