@@ -43,7 +43,7 @@ func main() {
 	ltask.UseEmbedFS(&luafs)
 	ltask.OpenLibs(L, lib)
 
-	scode, err := luafs.ReadFile("src/main.lua")
+	scode, err := luafs.ReadFile("src/bootstrap.lua")
 	if err != nil {
 		panic(err)
 	}
