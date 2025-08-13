@@ -1,11 +1,15 @@
 package main
 
 import (
+	"embed"
 	"os"
 
 	"go.yuchanns.xyz/ltask"
 	"go.yuchanns.xyz/lua"
 )
+
+//go:embed src/*.lua
+var luafs embed.FS
 
 func main() {
 	fs, err := os.CreateTemp("", luapattern)
@@ -38,7 +42,11 @@ func main() {
 	L.OpenLibs()
 	ltask.OpenLibs(L, lib)
 
-	err = L.DoFile("main.lua")
+	scode, err := luafs.ReadFile("src/main.lua")
+	if err != nil {
+		panic(err)
+	}
+	err = L.DoString(string(scode))
 	if err != nil {
 		panic(err)
 	}
