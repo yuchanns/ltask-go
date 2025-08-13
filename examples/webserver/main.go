@@ -8,7 +8,7 @@ import (
 )
 
 func main() {
-	fs, err := os.CreateTemp("", "")
+	fs, err := os.CreateTemp("", luapattern)
 	if err != nil {
 		panic(err)
 	}

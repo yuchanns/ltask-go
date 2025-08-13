@@ -34,7 +34,7 @@ jobs:
           VERSION="${{ matrix.version }}"
           VER="${VERSION//./}"
           echo "version=${VER}" >> $GITHUB_OUTPUT
-      - name: Cache Lua dynamic library
+      - name: Cache Lua
         uses: actions/cache@v4
         id: cache
         with:
@@ -43,7 +43,7 @@ jobs:
           key: lua-${{ matrix.os }}-${{ matrix.version }}-${{ hashFiles('Makefile') }}
           restore-keys: |
             lua-${{ matrix.os }}-${{ matrix.version }}-
-      - name: Build Lua dynamic library
+      - name: Build Lua
         if: steps.cache.outputs.cache-hit != 'true'
         working-directory: lua
         run: make lua${{ steps.module.outputs.version }}
@@ -62,3 +62,39 @@ jobs:
         working-directory: ltask-go
         env:
           CGO_ENABLE: 0 # Disable CGO to ensure pure Go tests
+  examples:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        example: [webserver]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: ilammy/msvc-dev-cmd@v1
+        if: matrix.os == 'windows-latest'
+      - name: Cache Lua
+        uses: actions/cache@v4
+        id: cache
+        with:
+          path: |
+            examples/${{ matrix.example }}/build/.lua
+          key: lua-${{ matrix.os }}-${{ matrix.example }}
+          restore-keys: |
+            lua-${{ matrix.os }}-${{ matrix.example }}-
+      - name: Build Lua
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: make lua54
+        working-directory: examples/${{ matrix.example }}
+        shell: bash
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - name: Run example
+        run: |
+          go run .
+        working-directory: examples/${{ matrix.example }}
+        env:
+          CGO_ENABLE: 0 # Disable CGO to ensure pure Go tests
+
