@@ -1,0 +1,3 @@
+[submodule "examples/webserver/lua54"]
+	path = examples/webserver/lua54
+	url = https://github.com/lua/lua
