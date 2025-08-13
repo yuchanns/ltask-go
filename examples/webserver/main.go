@@ -40,6 +40,7 @@ func main() {
 	defer L.Close()
 
 	L.OpenLibs()
+	ltask.UseEmbedFS(&luafs)
 	ltask.OpenLibs(L, lib)
 
 	scode, err := luafs.ReadFile("src/main.lua")
