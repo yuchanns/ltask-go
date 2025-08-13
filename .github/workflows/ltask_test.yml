@@ -17,13 +17,7 @@ jobs:
         version: ["5.4"]
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/checkout@v4
         with:
-          path: ltask-go
-      - uses: actions/checkout@v4
-        with:
-          path: lua
-          repository: yuchanns/lua
           submodules: recursive
       - uses: ilammy/msvc-dev-cmd@v1
         if: matrix.os == 'windows-latest'
@@ -51,14 +45,9 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: stable
-      - name: Set up Go workspace
-        run: |
-          go work init
-          go work use ./ltask-go
-          go work use ./lua
       - name: Run tests
         run: |
           go test -gcflags=all=-d=checkptr -v -race
-        working-directory: ltask-go
+        working-directory: ltask
         env:
           CGO_ENABLE: 0 # Disable CGO to ensure pure Go tests
