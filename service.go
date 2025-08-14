@@ -446,12 +446,38 @@ func (p *servicePool) destroy() {
 	malloc.Free(unsafe.Pointer(p))
 }
 
+// OnServiceInit registers lua.GoFunc to be called when a service is initialized.
+// This allows users to add custom Lua functions or libraries written in Go that will be available
+// in each service's Lua state.
+// It is not thread-safe and should be called before ltask.OpenLibs.
+//
+// Example:
+//
+//	OnServiceInit(func(L *lua.State) int {
+//		L.Requiref("my_module", myModuleOpen, false)
+//		return 0
+//	})
+//	OpenLibs(L)
+//	L.DoFile("my_script.lua")
+func OnServiceInit(f ...lua.GoFunc) {
+	luaOpenFuncs = append(luaOpenFuncs, f...)
+}
+
+var luaOpenFuncs = []lua.GoFunc{}
+
 func initService(L *lua.State) int {
 	// TODO: set ud as a string
 	ud := L.ToUserData(1)
 	L.PushLightUserData(ud)
 	L.SetField(lua.LUA_REGISTRYINDEX, "LTASK_ID")
 	L.OpenLibs()
+	for _, lOpen := range luaOpenFuncs {
+		L.PushGoFunction(lOpen)
+		err := L.PCall(0, 0, 0)
+		if err != nil {
+			return L.Errorf("Init service error: %s", err)
+		}
+	}
 	return 0
 }
 
