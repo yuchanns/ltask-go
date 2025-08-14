@@ -72,35 +72,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-      - uses: actions/checkout@v4
-        with:
-          repository: actboy168/luamake
-          path: luamake
-          submodules: recursive
-      - name: Build luamake (Linux)
-        if: matrix.os == 'ubuntu-latest'
-        working-directory: luamake
-        run: |
-          sudo apt update
-          sudo apt install gcc g++ ninja-build binutils-dev libunwind-dev -y
-          compile/install.sh
-          echo $(pwd) >> $GITHUB_PATH
-      - name: Build luamake (macOS)
-        if: matrix.os == 'macos-latest'
-        working-directory: luamake
-        run: |
-          brew install ninja
-          compile/install.sh
-          echo $(pwd) >> $GITHUB_PATH
-      - uses: ilammy/msvc-dev-cmd@v1
-        if: matrix.os == 'windows-latest'
-      - name: Build luamake (Windows)
-        if: matrix.os == 'windows-latest'
-        working-directory: luamake
-        run: |
-          compile/install.bat
-          echo $(pwd) >> $GITHUB_PATH
-        shell: bash
+      - uses: yuchanns/actions-luamake@v1.0.0
       - name: Cache Lua
         uses: actions/cache@v4
         id: cache
