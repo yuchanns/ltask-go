@@ -6,5 +6,5 @@ import _ "embed"
 
 var luapattern = "*.so"
 
-//go:embed build/.lua/lib/liblua54.so
+//go:embed build/bin/liblua54.so
 var lualib []byte
