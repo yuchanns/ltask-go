@@ -1,0 +1,66 @@
+name: ltask Example
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  examples:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        example: [webserver]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Cache C Dependencies
+        uses: actions/cache@v4
+        id: cache
+        with:
+          path: |
+            examples/${{ matrix.example }}/build/bin
+          key: ltask-${{ matrix.os }}-${{ matrix.example }}-${{ hashFiles(format('examples/{0}/make.lua', matrix.example)) }}
+      - uses: yuchanns/actions-luamake@v1.0.0
+        if: steps.cache.outputs.cache-hit != 'true'
+        with:
+          luamake-version: 'master'
+      - name: Setup dependencies (Linux)
+        if: runner.os == 'Linux' && steps.cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          sudo apt update
+          sudo apt install gcc g++ ninja-build binutils-dev libunwind-dev -y
+      - name: Setup MSVC (Windows)
+        if: runner.os == 'Windows' && steps.cache.outputs.cache-hit != 'true'
+        uses: ilammy/msvc-dev-cmd@v1
+      - name: Build C Dependencies (Unix)
+        if: steps.cache.outputs.cache-hit != 'true' && runner.os != 'Windows'
+        run: luamake
+        working-directory: examples/${{ matrix.example }}
+        shell: bash
+      - name: Build C Dependencies (Windows)
+        if: steps.cache.outputs.cache-hit != 'true' && runner.os == 'Windows'
+        run: |
+          cd bee
+          luamake -EXE lua
+          cd -
+          mkdir -p build/bin
+          cp bee/build/bin/lua54.dll build/bin/lua54.dll
+        working-directory: examples/${{ matrix.example }}
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - name: Run example
+        run: |
+          go run .
+        working-directory: examples/${{ matrix.example }}
+        env:
+          CGO_ENABLE: 0 # Disable CGO to ensure pure Go tests
+
