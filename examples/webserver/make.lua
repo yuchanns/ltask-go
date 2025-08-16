@@ -11,16 +11,6 @@ lm:conf({
   c = "c17",
   cxx = "c++20",
   visibility = "default",
-  windows = {
-    defines = {
-      "_CRT_SECURE_NO_WARNINGS",
-      "_WIN32_WINNT=0x0602",
-    },
-    flags = {
-      "/utf-8",
-      "/arch:AVX2",
-    },
-  },
 })
 
 lm:import("clibs/lua/make.lua")
