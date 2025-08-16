@@ -6,11 +6,11 @@ require (
 	github.com/phuslu/log v1.0.119
 	github.com/smasher164/mem v0.0.0-20200311200026-6e9ed23f934d
 	github.com/stretchr/testify v1.10.0
-	go.yuchanns.xyz/lua v0.0.0-20250727075619-463d1051632b
+	go.yuchanns.xyz/lua v0.0.0-20250803093435-abc953a0b142
 	go.yuchanns.xyz/timefall v0.1.0
 	go.yuchanns.xyz/xxchan v0.1.0
 	go.yuchanns.xyz/xxcond v0.1.0
-	golang.org/x/sys v0.34.0
+	golang.org/x/sys v0.35.0
 )
 
 require (

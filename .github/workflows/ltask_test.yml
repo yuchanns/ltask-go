@@ -25,8 +25,6 @@ jobs:
           path: lua
           repository: yuchanns/lua
           submodules: recursive
-      - uses: ilammy/msvc-dev-cmd@v1
-        if: matrix.os == 'windows-latest'
       - name: Set module directory
         id: module
         shell: bash
@@ -34,19 +32,18 @@ jobs:
           VERSION="${{ matrix.version }}"
           VER="${VERSION//./}"
           echo "version=${VER}" >> $GITHUB_OUTPUT
-      - name: Cache Lua dynamic library
+      - name: Cache Lua
         uses: actions/cache@v4
         id: cache
         with:
           path: |
             lua/lua${{ steps.module.outputs.version }}/.lua
-          key: lua-${{ matrix.os }}-${{ matrix.version }}-${{ hashFiles('Makefile') }}
-          restore-keys: |
-            lua-${{ matrix.os }}-${{ matrix.version }}-
-      - name: Build Lua dynamic library
+          key: lua-${{ matrix.os }}-${{ hashFiles('lua/make.lua') }}
+      - uses: yuchanns/actions-luamake@v1.0.0
+      - name: Build Lua
         if: steps.cache.outputs.cache-hit != 'true'
         working-directory: lua
-        run: make lua${{ steps.module.outputs.version }}
+        run: luamake
         shell: bash
       - uses: actions/setup-go@v5
         with:

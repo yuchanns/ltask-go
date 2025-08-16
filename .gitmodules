@@ -1,0 +1,9 @@
+[submodule "examples/webserver/lua54"]
+	path = examples/webserver/lua54
+	url = https://github.com/lua/lua
+[submodule "examples/webserver/bee"]
+	path = examples/webserver/bee
+	url = https://github.com/actboy168/bee.lua
+[submodule "examples/webserver/3rd/bee.lua"]
+	path = examples/webserver/3rd/bee.lua
+	url = git@github.com:actboy168/bee.lua
