@@ -25,7 +25,7 @@ lm:conf({
 
 lm:import("clibs/lua/make.lua")
 lm.EXE = "lua"
-lm:import("bee/make.lua")
+lm:import("3rd/bee.lua/make.lua")
 
 if lm.os ~= "windows" then
   local bee_output = bindir .. "/" .. (lm.os == "macos" and "libbee.dylib" or "libbee.so")

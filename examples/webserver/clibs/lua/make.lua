@@ -3,14 +3,14 @@ local lm = require("luamake")
 if lm.os ~= "windows" then
   lm:source_set("source_lua54")({
     sources = {
-      lm.base_dir .. "/bee/3rd/lua54/*.c",
-      "!" .. lm.base_dir .. "/bee/3rd/lua54/onelua.c",
-      "!" .. lm.base_dir .. "/bee/3rd/lua54/lua.c",
-      "!" .. lm.base_dir .. "/bee/3rd/lua54/luac.c",
-      "!" .. lm.base_dir .. "/bee/3rd/lua54/ltests.c",
+      lm.base_dir .. "/3rd/bee.lua/3rd/lua54/*.c",
+      "!" .. lm.base_dir .. "/3rd/bee.lua/3rd/lua54/onelua.c",
+      "!" .. lm.base_dir .. "/3rd/bee.lua/3rd/lua54/lua.c",
+      "!" .. lm.base_dir .. "/3rd/bee.lua/3rd/lua54/luac.c",
+      "!" .. lm.base_dir .. "/3rd/bee.lua/3rd/lua54/ltests.c",
     },
     includes = {
-      lm.base_dir .. "/bee/3rd/lua54",
+      lm.base_dir .. "/3rd/bee.lua/3rd/lua54",
     },
     visibility = "default",
     links = {
