@@ -68,13 +68,17 @@ if lm.os ~= "windows" then
     inputs = { bindir .. "/bee.so" },
     outputs = { bee_output },
   })
+else
+  if lm.os == "windows" then lm:dll("bee")({
+    deps = { "source_bee", "lua54" },
+  }) end
 end
 
 lm:phony("all")({
   deps = {
     "lua54",
     lm.os ~= "windows" and "copy_lua54",
-    lm.os ~= "windows" and "bee",
+    "bee",
     lm.os ~= "windows" and "copy_bee",
   },
 })

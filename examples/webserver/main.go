@@ -15,7 +15,7 @@ import (
 var luafs embed.FS
 
 func main() {
-	tmpdir := fmt.Sprintf("%s/ltask", os.TempDir())
+	tmpdir := path.Join(os.TempDir(), "ltask")
 	err := os.MkdirAll(tmpdir, os.ModePerm)
 	if err != nil {
 		panic(err)
