@@ -75,7 +75,7 @@ lm:phony("all")({
     "lua54",
     lm.os ~= "windows" and "copy_lua54",
     lm.os ~= "windows" and "bee",
-    lm.os == "macos" and "copy_bee",
+    lm.os ~= "windows" and "copy_bee",
   },
 })
 

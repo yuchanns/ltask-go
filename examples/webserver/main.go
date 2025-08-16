@@ -2,7 +2,10 @@ package main
 
 import (
 	"embed"
+	"fmt"
 	"os"
+	"path"
+	"strings"
 
 	"go.yuchanns.xyz/ltask"
 	"go.yuchanns.xyz/lua"
@@ -12,7 +15,14 @@ import (
 var luafs embed.FS
 
 func main() {
-	fs, err := os.CreateTemp("", luapattern)
+	tmpdir := fmt.Sprintf("%s/ltask", os.TempDir())
+	err := os.MkdirAll(tmpdir, os.ModePerm)
+	if err != nil {
+		panic(err)
+	}
+	defer os.RemoveAll(tmpdir)
+
+	fs, err := os.CreateTemp(tmpdir, libpattern)
 	if err != nil {
 		panic(err)
 	}
@@ -25,7 +35,9 @@ func main() {
 		panic(err)
 	}
 
-	defer os.Remove(fs.Name())
+	if err := installBee(tmpdir); err != nil {
+		panic(err)
+	}
 
 	lib, err := lua.New(fs.Name())
 	if err != nil {
@@ -43,6 +55,11 @@ func main() {
 	ltask.UseEmbedFS(&luafs)
 	ltask.OpenLibs(L, lib)
 
+	cpath := strings.ReplaceAll(path.Join(tmpdir, fmt.Sprintf("?.%s", libext)), "\\", "\\\\")
+	err = L.DoString(fmt.Sprintf("package.cpath = package.cpath .. ';%s'", cpath))
+	if err != nil {
+		panic(err)
+	}
 	scode, err := luafs.ReadFile("src/bootstrap.lua")
 	if err != nil {
 		panic(err)
