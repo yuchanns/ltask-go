@@ -40,20 +40,11 @@ jobs:
       - name: Setup MSVC (Windows)
         if: runner.os == 'Windows' && steps.cache.outputs.cache-hit != 'true'
         uses: ilammy/msvc-dev-cmd@v1
-      - name: Build C Dependencies (Unix)
-        if: steps.cache.outputs.cache-hit != 'true' && runner.os != 'Windows'
+      - name: Build C Dependencies
+        if: steps.cache.outputs.cache-hit != 'true'
         run: luamake
         working-directory: examples/${{ matrix.example }}
         shell: bash
-      - name: Build C Dependencies (Windows)
-        if: steps.cache.outputs.cache-hit != 'true' && runner.os == 'Windows'
-        run: |
-          cd bee
-          luamake -EXE lua
-          cd -
-          mkdir -p build/bin
-          cp bee/build/bin/lua54.dll build/bin/lua54.dll
-        working-directory: examples/${{ matrix.example }}
       - uses: actions/setup-go@v5
         with:
           go-version: stable
