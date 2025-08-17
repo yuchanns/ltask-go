@@ -1,64 +1,82 @@
 local lm = require("luamake")
 
 lm.base_dir = lm:path(".")
+lm.lua = "54"
+lm.luadir = lm.base_dir .. "/3rd/bee.lua/3rd/lua" .. lm.lua
 
-local bindir = "build/bin"
-lm.bindir = bindir
+lm.bindir = "build/bin"
+
+local function macos_version()
+  local cxx = lm.cxx or "c++17"
+  local version = cxx:match("^c%+%+(.+)$")
+  if version == "17" then
+    return "macos10.15"
+  else
+    return "macos13.3"
+  end
+end
 
 lm:conf({
   compile_commands = "build",
   mode = "debug",
   c = "c17",
-  cxx = "c++20",
+  cxx = "c++17",
   visibility = "default",
   windows = {
     defines = {
       "_CRT_SECURE_NO_WARNINGS",
       "_WIN32_WINNT=0x0602",
     },
-    flags = {
-      "/utf-8",
-      "/arch:AVX2",
+  },
+  msvc = {
+    flags = "/utf-8",
+    ldflags = lm.mode == "debug" and lm.arch == "x86_64" and {
+      "/STACK:" .. 0x160000,
+    },
+  },
+  macos = {
+    flags = "-Wunguarded-availability",
+    sys = macos_version(),
+  },
+  linux = {
+    crt = "static",
+    flags = "-fPIC",
+    ldflags = {
+      "-Wl,-E",
+      "-static-libgcc",
     },
   },
 })
 
 lm:import("clibs/lua/make.lua")
-lm.EXE = "lua"
-lm:import("3rd/bee.lua/make.lua")
+lm:import("clibs/bee/make.lua")
 
-if lm.os ~= "windows" then
-  local bee_output = bindir .. "/" .. (lm.os == "macos" and "libbee.dylib" or "libbee.so")
-  lm:copy("copy_bee")({
-    deps = { "bee" },
-    inputs = { bindir .. "/bee.so" },
-    outputs = { bee_output },
-  })
-  local output = lm.bindir
-    .. "/"
-    .. (lm.os == "windows" and "lua54.dll" or (lm.os == "macos" and "liblua54.dylib" or "liblua54.so"))
+lm:dll("lua54")({
+  deps = { "source_lua54", lm.os == "windows" and "bee_utf8_crt" },
+})
 
-  lm:dll("lua54")({
-    deps = { "source_lua54" },
-  })
+lm:copy("copy_lua54")({
+  deps = { "lua54" },
+  inputs = { lm.bindir .. "/lua54.so" },
+  outputs = { lm.bindir .. "/lua54.dylib" },
+})
 
-  lm:copy("copy_lua54")({
-    deps = { "lua54" },
-    inputs = { lm.bindir .. "/lua54.so" },
-    outputs = { output },
-  })
-else
-  if lm.os == "windows" then lm:dll("bee")({
-    deps = { "source_bee", "lua54" },
-  }) end
-end
+lm:dll("bee")({
+  deps = { "source_bee", "lua54" },
+})
+
+lm:copy("copy_bee")({
+  deps = { "bee" },
+  inputs = { lm.bindir .. "/bee.so" },
+  outputs = { lm.bindir .. "/bee.dylib" },
+})
 
 lm:phony("all")({
   deps = {
     "lua54",
-    lm.os ~= "windows" and "copy_lua54",
+    lm.os == "macos" and "copy_lua54",
     "bee",
-    lm.os ~= "windows" and "copy_bee",
+    lm.os == "macos" and "copy_bee",
   },
 })
 

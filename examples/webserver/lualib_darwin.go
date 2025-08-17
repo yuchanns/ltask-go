@@ -11,10 +11,10 @@ import (
 var libext = "dylib"
 var libpattern = "*." + libext
 
-//go:embed build/bin/liblua54.dylib
+//go:embed build/bin/lua54.dylib
 var lualib []byte
 
-//go:embed build/bin/libbee.dylib
+//go:embed build/bin/bee.dylib
 var beelib []byte
 
 func installBee(tmpdir string) (err error) {

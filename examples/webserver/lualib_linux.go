@@ -11,10 +11,10 @@ import (
 var libext = "so"
 var libpattern = "*." + libext
 
-//go:embed build/bin/liblua54.so
+//go:embed build/bin/lua54.so
 var lualib []byte
 
-//go:embed build/bin/libbee.so
+//go:embed build/bin/bee.so
 var beelib []byte
 
 func installBee(tmpdir string) (err error) {
