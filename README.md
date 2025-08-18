@@ -113,7 +113,7 @@ git clone --recurse-submodules https://github.com/yuchanns/lua
 
 2. **Prepare the dynamic artifacts**
 ```bash
-cd lua && make lua54 && cd -
+cd lua && luamake && cd -
 ```
 
 3. **Run the tests**
