@@ -63,5 +63,8 @@ start({
       name = "network",
       unique = true,
     },
+    {
+      name = "start",
+    },
   },
 })
