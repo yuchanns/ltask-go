@@ -55,16 +55,9 @@ lm:dll("clibs")({
   deps = { "source_lua54", lm.os == "windows" and "bee_utf8_crt", "source_bee" },
 })
 
-lm:copy("copy_clibs")({
-  deps = { "clibs" },
-  inputs = { lm.bindir .. "/clibs.so" },
-  outputs = { lm.bindir .. "/clibs.dylib" },
-})
-
 lm:phony("all")({
   deps = {
     "clibs",
-    lm.os == "macos" and "copy_clibs",
   },
 })
 
