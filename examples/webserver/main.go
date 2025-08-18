@@ -2,17 +2,36 @@ package main
 
 import (
 	"embed"
-	"fmt"
 	"os"
 	"path"
-	"strings"
+	"unsafe"
 
+	"github.com/ebitengine/purego"
 	"go.yuchanns.xyz/ltask"
 	"go.yuchanns.xyz/lua"
 )
 
 //go:embed src/*.lua
 var luafs embed.FS
+
+var luaopenBeeSocket func(L unsafe.Pointer) int
+var luaopenBeeEpoll func(L unsafe.Pointer) int
+
+func luaopenlibs(L *lua.State) int {
+	_ = L.GetGlobal("package")
+	_, _ = L.GetField(-1, "preload")
+	l := []*lua.Reg{
+		{Name: "bee.socket", Func: func(L *lua.State) int {
+			return luaopenBeeSocket(L.L())
+		}},
+		{Name: "bee.epoll", Func: func(L *lua.State) int {
+			return luaopenBeeEpoll(L.L())
+		}},
+	}
+	L.SetFuncs(l, 0)
+	L.Pop(2)
+	return 0
+}
 
 func main() {
 	tmpdir := path.Join(os.TempDir(), "ltask")
@@ -26,16 +45,12 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	_, err = fs.Write(lualib)
+	_, err = fs.Write(clibs)
 	if err != nil {
 		panic(err)
 	}
 	err = fs.Close()
 	if err != nil {
-		panic(err)
-	}
-
-	if err := installBee(tmpdir); err != nil {
 		panic(err)
 	}
 
@@ -52,14 +67,19 @@ func main() {
 	defer L.Close()
 
 	L.OpenLibs()
-	ltask.UseEmbedFS(&luafs)
-	ltask.OpenLibs(L, lib)
 
-	cpath := strings.ReplaceAll(path.Join(tmpdir, fmt.Sprintf("?.%s", libext)), "\\", "\\\\")
-	err = L.DoString(fmt.Sprintf("package.cpath = package.cpath .. ';%s'", cpath))
+	clibs, err := loadLibrary(fs.Name())
 	if err != nil {
 		panic(err)
 	}
+	purego.RegisterLibFunc(&luaopenBeeSocket, clibs, "luaopen_bee_socket")
+	purego.RegisterLibFunc(&luaopenBeeEpoll, clibs, "luaopen_bee_epoll")
+
+	ltask.UseEmbedFS(&luafs)
+	ltask.OnServiceInit(luaopenlibs)
+	ltask.OpenLibs(L, lib)
+	luaopenlibs(L)
+
 	scode, err := luafs.ReadFile("src/bootstrap.lua")
 	if err != nil {
 		panic(err)

@@ -3,7 +3,6 @@ local lm = require("luamake")
 lm:source_set("source_lua54")({
   sources = {
     lm.luadir .. "/*.c",
-    lm.os == "windows" and lm.base_dir .. "/3rd/bee.lua/3rd/lua-patch/bee_assert.c",
     "!" .. lm.luadir .. "/onelua.c",
     "!" .. lm.luadir .. "/lua.c",
     "!" .. lm.luadir .. "/luac.c",
@@ -14,8 +13,10 @@ lm:source_set("source_lua54")({
   },
   visibility = "default",
   links = {
-    "m",
+    lm.os ~= "windows" and "m",
+    lm.os ~= "windows" and "dl",
   },
+  defines = "NDEBUG",
 
   windows = {
     defines = {

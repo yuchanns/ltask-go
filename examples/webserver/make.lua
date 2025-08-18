@@ -51,32 +51,20 @@ lm:conf({
 lm:import("clibs/lua/make.lua")
 lm:import("clibs/bee/make.lua")
 
-lm:dll("lua54")({
-  deps = { "source_lua54", lm.os == "windows" and "bee_utf8_crt" },
+lm:dll("clibs")({
+  deps = { "source_lua54", lm.os == "windows" and "bee_utf8_crt", "source_bee" },
 })
 
-lm:copy("copy_lua54")({
-  deps = { "lua54" },
-  inputs = { lm.bindir .. "/lua54.so" },
-  outputs = { lm.bindir .. "/lua54.dylib" },
-})
-
-lm:dll("bee")({
-  deps = { "source_bee", "lua54" },
-})
-
-lm:copy("copy_bee")({
-  deps = { "bee" },
-  inputs = { lm.bindir .. "/bee.so" },
-  outputs = { lm.bindir .. "/bee.dylib" },
+lm:copy("copy_clibs")({
+  deps = { "clibs" },
+  inputs = { lm.bindir .. "/clibs.so" },
+  outputs = { lm.bindir .. "/clibs.dylib" },
 })
 
 lm:phony("all")({
   deps = {
-    "lua54",
-    lm.os == "macos" and "copy_lua54",
-    "bee",
-    lm.os == "macos" and "copy_bee",
+    "clibs",
+    lm.os == "macos" and "copy_clibs",
   },
 })
 
