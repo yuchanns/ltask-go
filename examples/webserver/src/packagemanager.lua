@@ -60,7 +60,14 @@ local function loadenv(name)
   return env
 end
 
-function ImportPackage(name) return loadenv(name).require("main") end
+function Require(name)
+  local pkg, path = name:match("^([^%.]+)%.(.+)$")
+  if not pkg then
+    pkg = name
+    path = "main"
+  end
+  return loadenv(pkg).require(path)
+end
 
 return {
   loadenv = loadenv,
