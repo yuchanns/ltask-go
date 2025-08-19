@@ -1,5 +1,7 @@
 local ltask = require("ltask")
 
+local http = ImportPackage("http")
+
 local S = {}
 
 local network = ltask.queryservice("network")

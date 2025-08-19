@@ -27,6 +27,7 @@ local filename, err = ltask.searchpath(name, "${service_path}")
 if not filename then
   return nil, err
 end
+ltask.dofile("src/packagemanager.lua")
 return ltask.loadfile(filename)
 ]=]):gsub("%$%{([^}]*)%}", {
       lua_path = package.path,

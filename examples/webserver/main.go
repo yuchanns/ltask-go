@@ -8,7 +8,7 @@ import (
 	"go.yuchanns.xyz/lua"
 )
 
-//go:embed src/*.lua
+//go:embed src/*.lua src/**/*.lua
 var luafs embed.FS
 
 func main() {
