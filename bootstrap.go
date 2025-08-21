@@ -31,6 +31,24 @@ func getPtr[T any](L *lua.State, key string) *T {
 //go:embed lualib/*.lua service/*.lua
 var embedfs embed.FS
 
+var embedfsList = []*embed.FS{
+	&embedfs,
+}
+
+// UseEmbedFS allows you to add additional embed.FS instances to the ltask runtime.
+// Calling it before `ltask.OpenLib`. It is not thread-safe.
+// This is useful if you want to embed your own Lua scripts as built-in services.
+// To access these files, use:
+// - `require("ltask").searchpath("yourfile.lua")`
+// - `require("ltask").loadfile("yourfile.lua")`
+// - `require("ltask.bootstrap").searchpath("yourfile.lua")`
+// - `require("ltask.bootstrap").loadfile("yourfile.lua")`
+// - `require("ltask.bootstrap").dofile("yourfile.lua")`
+// - `require("ltask.bootstrap").readfile("yourfile.lua")`
+func UseEmbedFS(fs ...*embed.FS) {
+	embedfsList = append(embedfsList, fs...)
+}
+
 func ltaskInit(L *lua.State) int {
 	if L.GetTop() == 0 {
 		L.NewTable()

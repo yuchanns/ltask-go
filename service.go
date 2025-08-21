@@ -446,12 +446,25 @@ func (p *servicePool) destroy() {
 	malloc.Free(unsafe.Pointer(p))
 }
 
+var ltaskExternalOpenLibs func(L *lua.State)
+
+// RegisterExternalOpenLibs registers a function to open external libraries.
+// This function will be called when a new service is initialized.
+// If not set, the default Lua libraries will be opened.
+func RegisterExternalOpenLibs(f func(L *lua.State)) {
+	ltaskExternalOpenLibs = f
+}
+
 func initService(L *lua.State) int {
 	// TODO: set ud as a string
 	ud := L.ToUserData(1)
 	L.PushLightUserData(ud)
 	L.SetField(lua.LUA_REGISTRYINDEX, "LTASK_ID")
-	L.OpenLibs()
+	if ltaskExternalOpenLibs != nil {
+		ltaskExternalOpenLibs(L)
+	} else {
+		L.OpenLibs()
+	}
 	return 0
 }
 

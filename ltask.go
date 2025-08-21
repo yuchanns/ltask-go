@@ -53,6 +53,8 @@ func ltaskOpen(L *lua.State) int {
 		{Name: "timer_sleep", Func: ltaskSleep},
 		{Name: "loadfile", Func: ltaskLoadFile},
 		{Name: "searchpath", Func: ltaskSearchPath},
+		{Name: "readfile", Func: ltaskReadFile},
+		{Name: "dofile", Func: ltaskDoFile},
 	}
 
 	L.NewLib(l)
@@ -377,49 +379,76 @@ func getErrorMessage(L *lua.State) string {
 
 func ltaskReadFile(L *lua.State) int {
 	fileName := L.CheckString(1)
-	scode, err := embedfs.ReadFile(fileName)
-	if err != nil {
-		L.PushNil()
-		L.PushString(err.Error())
-		return 2
+	var (
+		err   error
+		scode []byte
+	)
+	for _, embedfs := range embedfsList {
+		scode, err = embedfs.ReadFile(fileName)
+		if err == nil {
+			L.PushString(string(scode))
+			return 1
+		}
+		if !os.IsNotExist(err) {
+			break
+		}
 	}
-	L.PushString(string(scode))
-	return 1
+	L.PushNil()
+	L.PushString(err.Error())
+	return 2
 }
 
 func ltaskDoFile(L *lua.State) int {
 	fileName := L.CheckString(1)
-	scode, err := embedfs.ReadFile(fileName)
-	if err != nil {
-		L.PushNil()
-		L.PushString(err.Error())
-		return 2
+	var (
+		err   error
+		scode []byte
+	)
+	for _, embedfs := range embedfsList {
+		scode, err = embedfs.ReadFile(fileName)
+		if err == nil {
+			L.SetTop(0)
+			err = L.DoString(string(scode))
+			if err != nil {
+				L.PushNil()
+				L.PushString(err.Error())
+				return 2
+			}
+			return L.GetTop()
+		}
+		if !os.IsNotExist(err) {
+			break
+		}
 	}
-	L.SetTop(0)
-	err = L.DoString(string(scode))
-	if err != nil {
-		L.PushNil()
-		L.PushString(err.Error())
-		return 2
-	}
-	return L.GetTop()
+	L.PushNil()
+	L.PushString(err.Error())
+	return 2
 }
 
 func ltaskLoadFile(L *lua.State) int {
 	fileName := L.CheckString(1)
-	scode, err := embedfs.ReadFile(fileName)
-	if err != nil {
-		L.PushNil()
-		L.PushString(err.Error())
-		return 2
+	var (
+		err   error
+		scode []byte
+	)
+	for _, embedfs := range embedfsList {
+		scode, err = embedfs.ReadFile(fileName)
+		if err == nil {
+			err = L.LoadString(string(scode))
+			if err != nil {
+				L.PushNil()
+				L.PushString(err.Error())
+				return 2
+			}
+			return 1
+		}
+		if !os.IsNotExist(err) {
+			break
+		}
 	}
-	err = L.LoadString(string(scode))
-	if err != nil {
-		L.PushNil()
-		L.PushString(err.Error())
-		return 2
-	}
-	return 1
+	L.PushNil()
+	L.PushString(err.Error())
+	return 2
 }
 
 func ltaskSearchPath(L *lua.State) int {
@@ -436,17 +465,19 @@ func ltaskSearchPath(L *lua.State) int {
 		dir := path.Dir(fullPattern)
 		base := path.Base(fullPattern)
 
-		entries, err := embedfs.ReadDir(dir)
-		if err != nil {
-			continue
-		}
-		for _, entry := range entries {
-			if entry.IsDir() {
+		for _, embedfs := range embedfsList {
+			entries, err := embedfs.ReadDir(dir)
+			if err != nil {
 				continue
 			}
-			if entry.Name() == base {
-				L.PushString(path.Join(dir, entry.Name()))
-				return 1
+			for _, entry := range entries {
+				if entry.IsDir() {
+					continue
+				}
+				if entry.Name() == base {
+					L.PushString(path.Join(dir, entry.Name()))
+					return 1
+				}
 			}
 		}
 	}
