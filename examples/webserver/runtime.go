@@ -23,7 +23,9 @@ func externalOpenLibs(L *lua.State) {
 	t := reflect.TypeOf(&effi).Elem()
 	v := reflect.ValueOf(&effi).Elem()
 
-	var l []*lua.Reg
+	var l = []*lua.Reg{
+		{Name: "json", Func: luaOpenJSON},
+	}
 	for i := range t.NumField() {
 		field := t.Field(i)
 		if field.Type.Kind() != reflect.Func {

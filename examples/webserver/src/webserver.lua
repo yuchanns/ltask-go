@@ -1,6 +1,7 @@
 local ltask = require("ltask")
 
 local http = Require("http")
+local urllib = Require("http.url")
 
 local S = {}
 
@@ -48,10 +49,23 @@ local function new_conn(fd)
   return conn
 end
 
-function S.start(addr, port)
-  addr = addr or "127.0.0.1"
-  port = port or 8080
-  local fd = assert(net.bind("tcp", addr, port))
+local fd
+
+function S.start(conf)
+  local addr = conf.addr or "127.0.0.1"
+  local port = conf.port or 8080
+  fd = assert(net.bind("tcp", addr, port))
+  local cgi = {}
+  if conf.cgi then
+    for path, pname in pairs(conf.cgi) do
+      local package, name = pname:match("(.-)|(.*)")
+      if package then
+        cgi[path] = { package = package, name = name }
+      else
+        cgi[path] = { package = pname }
+      end
+    end
+  end
   ltask.fork(function()
     while true do
       local s = assert(net.listen(fd))
@@ -62,8 +76,33 @@ function S.start(addr, port)
           if code ~= 200 then
             response(conn.write, code)
           else
-            print("Received request:", method, url)
-            response(conn.write, 200, "Hello World!")
+            local fullpath, query = urllib.parse(url)
+            local root, path = fullpath:match("^/([^/]+)/?(.*)")
+            local mod = cgi[root]
+            if not mod then
+              response(conn.write, 404, "Not Found")
+            else
+              local ok, m = xpcall(Require, debug.traceback, mod.package)
+              if not ok then
+                response(conn.write, 500, m)
+              else
+                if query then query = urllib.parse_query(query) end
+                method = method:lower()
+                m = m[mod.name] or m
+                local f = m and m[method]
+                if f == nil then
+                  response(conn.write, 405, "Method Not Allowed")
+                else
+                  local data
+                  ok, code, data, header = xpcall(f, debug.traceback, path, query, header, body)
+                  if ok then
+                    response(conn.write, code or 200, data, header)
+                  else
+                    response(conn.write, 500, code)
+                  end
+                end
+              end
+            end
           end
         else
           if url == socket_error then
@@ -78,6 +117,12 @@ function S.start(addr, port)
   end)
 end
 
-function S.quit() ltask.quit() end
+function S.quit()
+  if fd then
+    net.close(fd)
+    fd = nil
+  end
+  ltask.quit()
+end
 
 return S

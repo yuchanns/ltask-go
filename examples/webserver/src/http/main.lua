@@ -142,4 +142,108 @@ end
 
 function httpd.write_response(...) return xpcall(writeall, debug.traceback, ...) end
 
+local function build_request(method, uri, header, body)
+  local t = {}
+  table.insert(t, string.format("%s %s HTTP/1.1\r\n", method, uri:match("^https?://[^/]+(/.*)$") or uri))
+  if header then
+    for k, v in pairs(header) do
+      if type(v) == "table" then
+        for _, vv in ipairs(v) do
+          table.insert(t, string.format("%s: %s\r\n", k, vv))
+        end
+      else
+        table.insert(t, string.format("%s: %s\r\n", k, v))
+      end
+    end
+  end
+  if not header or not header["Host"] then
+    local host = uri:match("^https?://([^:/]+)") or ""
+    table.insert(t, string.format("Host: %s\r\n", host))
+  end
+  if type(body) == "string" then
+    table.insert(t, string.format("Content-Length: %d\r\n", #body))
+    table.insert(t, "\r\n")
+    table.insert(t, body)
+  elseif type(body) == "function" then
+    table.insert(t, "Transfer-Encoding: chunked\r\n\r\n")
+    while true do
+      local chunk = body()
+      if not chunk or chunk == "" then
+        table.insert(t, "0\r\n\r\n")
+        break
+      else
+        table.insert(t, string.format("%x\r\n%s\r\n", #chunk, chunk))
+      end
+    end
+  else
+    table.insert(t, "\r\n")
+  end
+  return table.concat(t)
+end
+
+local function read_response(readbytes, bodylimit)
+  local tmpline = {}
+  local body = internal.recvheader(readbytes, tmpline, "")
+  if not body then
+    return 413 -- Request Entity Too Large
+  end
+  local status = assert(tmpline[1])
+  local httpver, statuscode, statusmsg = status:match("^HTTP/([%d%.]+)%s+(%d+)%s*(.*)$")
+  assert(httpver and statuscode)
+  statuscode = assert(tonumber(statuscode))
+  httpver = assert(tonumber(httpver))
+  if httpver < 1.0 or httpver > 1.1 then
+    return 505 -- HTTP Version not supported
+  end
+  local header = internal.parseheader(tmpline, 2, {})
+  if not header then
+    return 400 -- Bad response
+  end
+  local length = header["content-length"]
+  if length then length = tonumber(length) end
+  local mode = header["transfer-encoding"]
+  if mode then
+    if mode ~= "identity" and mode ~= "chunked" then
+      return 501 -- Not Implemented
+    end
+  end
+
+  if mode == "chunked" then
+    body, header = internal.recvchunkedbody(readbytes, bodylimit, header, body)
+    if not body then return 413 end
+  else
+    -- identity mode
+    if length then
+      if bodylimit and length > bodylimit then return 413 end
+      if #body >= length then
+        body = body:sub(1, length)
+      else
+        local padding = readbytes(length - #body)
+        body = body .. padding
+      end
+    end
+  end
+
+  return statuscode, statusmsg, header, body
+end
+
+function httpd.read_response(...)
+  local ok, code, msg, header, body = pcall(read_response, ...)
+  if ok then
+    return code, msg, header, body
+  else
+    return nil, code
+  end
+end
+
+function httpd.request(writebytes, readbytes, method, url, header, body, bodylimit)
+  method = method:upper()
+  local uri = url
+
+  local reqdata = build_request(method, uri, header, body)
+  writebytes(reqdata)
+  local code, msg, resp_header, resp_body = httpd.read_response(readbytes, bodylimit)
+  return code, msg, resp_header, resp_body
+end
+
 return httpd
