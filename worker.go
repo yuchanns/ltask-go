@@ -64,7 +64,9 @@ func (w *workerThread) getJob() (id serviceId) {
 		if job == 0 {
 			break
 		}
-		atomic.CompareAndSwapInt32(&w.serviceReady, job, 0)
+		if !atomic.CompareAndSwapInt32(&w.serviceReady, job, 0) {
+			continue
+		}
 		id = serviceId(job)
 		break
 	}
@@ -249,10 +251,7 @@ func (w *workerThread) start() {
 	atomic.AddInt32(&w.task.activeWorker, 1)
 	log.Debug().Msgf("Worker %d start", w.workerId)
 
-	for {
-		if w.termSignal > 0 {
-			break
-		}
+	for w.termSignal == 0 {
 		id := w.getJob()
 		var dead bool
 		if id == 0 {

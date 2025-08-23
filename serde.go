@@ -677,12 +677,13 @@ func (rb *readBlock) pushValue(L *lua.State, typ, cookie uint8) {
 			L.PushInteger(rb.getInteger(L, cookie))
 		}
 	case serdeTypeUserData:
-		if cookie == serdeTypeUserDataPointer {
+		switch cookie {
+		case serdeTypeUserDataPointer:
 			L.PushLightUserData(rb.getPointer(L))
-		} else if cookie == serdeTypeUserDataCFunc {
+		case serdeTypeUserDataCFunc:
 			fn := rb.getPointer(L)
 			L.PushCFunction(fn)
-		} else {
+		default:
 			L.Errorf("Invalid userdata")
 		}
 	case serdeTypeShortString:
@@ -690,19 +691,20 @@ func (rb *readBlock) pushValue(L *lua.State, typ, cookie uint8) {
 		L.PushString(str)
 	case serdeTypeLongString:
 		var length int
-		if cookie == 2 {
+		switch cookie {
+		case 2:
 			if l, ok := rb.readUint16(); ok {
 				length = int(l)
 			} else {
 				L.Errorf("Invalid serialize stream")
 			}
-		} else if cookie == 4 {
+		case 4:
 			if l, ok := rb.readUint32(); ok {
 				length = int(l)
 			} else {
 				L.Errorf("Invalid serialize stream")
 			}
-		} else {
+		default:
 			L.Errorf("Invalid serialize stream")
 		}
 		str := rb.getBuffer(L, length)

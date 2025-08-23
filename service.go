@@ -107,7 +107,7 @@ func (s *service) setLabel(label string) (ok bool) {
 
 func (s *service) loadString(source string, chunkName string) (err error) {
 	if s.L == nil {
-		err = fmt.Errorf("Init service first")
+		err = fmt.Errorf("init service first")
 		return
 	}
 	L := s.L

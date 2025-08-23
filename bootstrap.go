@@ -63,9 +63,9 @@ func ltaskInit(L *lua.State) int {
 
 	config.load(L, 1)
 
-	if config.crashLog != nil {
-		// TODO: set crash log
-	}
+	// if config.crashLog != nil {
+	// TODO: set crash log
+	// }
 
 	var task *ltask
 	luaLib := (*lua.Lib)(L.ToUserData(L.UpValueIndex(1)))
@@ -89,11 +89,6 @@ func ltaskBootPushLog(L *lua.State) int {
 type timerEvent struct {
 	session session
 	id      serviceId
-}
-
-type timerUpdateUd struct {
-	L *lua.State
-	n int
 }
 
 var centisecond = time.Duration(10 * time.Millisecond)

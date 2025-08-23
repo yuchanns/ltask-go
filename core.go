@@ -68,13 +68,10 @@ func (task *ltask) init(L *lua.State, config *ltaskConfig, luaLib *lua.Lib) {
 		task.externalMessage = xxchan.Make[unsafe.Pointer](ptr, int(config.externalQueue))
 	}
 
-	if L.GetField(1, "debuglog") == lua.LUA_TSTRING {
-		logFile := L.ToString(-1)
-		if logFile != "=" {
-		}
-	} else {
+	if L.GetField(1, "debuglog") != lua.LUA_TSTRING {
 		log.DefaultLogger.SetLevel(log.InfoLevel)
 	}
+	// TODO: file logging
 
 	atomic.StoreInt32(&task.scheduleOwner, threadNone)
 	atomic.StoreInt32(&task.activeWorker, 0)
@@ -237,7 +234,9 @@ func (task *ltask) assignPrepare(prepare []serviceId) {
 			}
 			w := &task.workers[workerId]
 			workerId++
-			if !(useBusy || w.busy == 0) || !(w.binding == 0 || useBinding) {
+			busyCondition := !useBusy && w.busy != 0
+			bindingCondition := w.binding != 0 && !useBinding
+			if busyCondition || bindingCondition {
 				continue
 			}
 			assign := w.assignJob(id)
