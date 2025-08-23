@@ -114,8 +114,8 @@ func newConn(handle int) *conn {
 	}
 }
 
-func (c *conn) close() {
-	closeSocket(int(c.handle))
+func (c *conn) close() (err error) {
+	return closeSocket(int(c.handle))
 }
 
 func (c *conn) write(b []byte) (n int, err error) {

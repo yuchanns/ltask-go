@@ -38,7 +38,7 @@ func (s *Suite) TearDown() {
 	if s.lib == nil {
 		return
 	}
-	s.lib.Close()
+	_ = s.lib.Close()
 }
 
 func TestSuite(t *testing.T) {

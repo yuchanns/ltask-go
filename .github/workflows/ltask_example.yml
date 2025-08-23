@@ -48,6 +48,12 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: stable
+      - name: Lint (Linux)
+        uses: golangci/golangci-lint-action@v8
+        if: matrix.os == 'ubuntu-latest'
+        with:
+          version: "v2.1"
+          working-directory: examples/${{ matrix.example }}
       - name: Run example
         run: |
           go run .

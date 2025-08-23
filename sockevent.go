@@ -1,6 +1,7 @@
 package ltask
 
 import (
+	"fmt"
 	"net"
 	"sync/atomic"
 
@@ -35,7 +36,10 @@ func (s *sockEvent) open() (ok bool) {
 		}
 	}
 	defer func() {
-		listener.Close()
+		err := listener.Close()
+		if err != nil {
+			log.Debug().Msgf("sockEvent: close listener failed: %s", err)
+		}
 		if !ok {
 			s.close()
 		}
@@ -60,26 +64,35 @@ func (s *sockEvent) open() (ok bool) {
 		log.Debug().Msgf("sockEvent: dial %s failed: %v", addr.String(), err)
 		return
 	}
-	defer writeConn.Close()
+	defer func() {
+		err := writeConn.Close()
+		if err != nil {
+			log.Debug().Msgf("sockEvent: close writeConn failed: %s", err)
+		}
+	}()
 
 	var readConn net.Conn
 	select {
 	case readConn = <-connChan:
-		defer readConn.Close()
+		defer func() {
+			err := readConn.Close()
+			if err != nil {
+				log.Debug().Msgf("sockEvent: close readConn failed: %s", err)
+			}
+		}()
 	case err = <-errChan:
 		log.Debug().Msgf("sockEvent: accept %s failed: %v", addr.String(), err)
 		return
 	}
 
-	if tcpConn, ok := writeConn.(*net.TCPConn); ok {
-		tcpConn.SetNoDelay(true)
-		tcpConn.SetKeepAlive(false)
-		s.pipe[1], _ = fdGet(tcpConn)
+	s.pipe[0], err = netConnToFd(readConn)
+	if err != nil {
+		log.Debug().Msgf("sockEvent: get fd for pipe[0] failed: %s", err)
 	}
-	if tcpConn, ok := readConn.(*net.TCPConn); ok {
-		tcpConn.SetNoDelay(true)
-		tcpConn.SetKeepAlive(false)
-		s.pipe[0], _ = fdGet(tcpConn)
+
+	s.pipe[1], err = netConnToFd(writeConn)
+	if err != nil {
+		log.Debug().Msgf("sockEvent: get fd for pipe[1] failed: %s", err)
 	}
 
 	_, err = writeConn.Write([]byte{0})
@@ -91,14 +104,42 @@ func (s *sockEvent) open() (ok bool) {
 	return
 }
 
+func netConnToFd(conn net.Conn) (fd int, err error) {
+	defer func() {
+		if err != nil {
+			fd = socketInvalid
+		}
+	}()
+	tcpConn, ok := conn.(*net.TCPConn)
+	if !ok {
+		return socketInvalid, fmt.Errorf("expected *net.TCPConn, got %T", conn)
+	}
+	err = tcpConn.SetNoDelay(true)
+	if err != nil {
+		return
+	}
+	err = tcpConn.SetKeepAlive(false)
+	if err != nil {
+		return
+	}
+	fd, err = fdGet(tcpConn)
+	return
+}
+
 func (s *sockEvent) close() {
 	if s.pipe[0] != socketInvalid {
 		conn := newConn(s.pipe[0])
-		conn.close()
+		err := conn.close()
+		if err != nil {
+			log.Debug().Msgf("sockEvent: close pipe[0] failed: %s", err)
+		}
 	}
 	if s.pipe[1] != socketInvalid {
 		conn := newConn(s.pipe[1])
-		conn.close()
+		err := conn.close()
+		if err != nil {
+			log.Debug().Msgf("sockEvent: close pipe[1] failed: %s", err)
+		}
 	}
 }
 

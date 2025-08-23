@@ -8,7 +8,6 @@ import (
 	"unsafe"
 
 	"github.com/phuslu/log"
-	"github.com/smasher164/mem"
 	"go.yuchanns.xyz/lua"
 	"go.yuchanns.xyz/xxchan"
 )
@@ -108,7 +107,7 @@ func (s *service) setLabel(label string) (ok bool) {
 
 func (s *service) loadString(source string, chunkName string) (err error) {
 	if s.L == nil {
-		err = fmt.Errorf("Init service first")
+		err = fmt.Errorf("init service first")
 		return
 	}
 	L := s.L
@@ -159,29 +158,6 @@ func newServicePool(config *ltaskConfig) (pool *servicePool) {
 	pool.queueLen = config.queueSending
 	pool.s = unsafe.Slice((**service)(unsafe.Pointer(uintptr(ptr)+uintptr(structSize))), int(config.maxService))
 	return
-}
-
-func (task *ltask) checkMessageTo(to serviceId) {
-	p := task.services
-	status := p.getStatus(to)
-	if status == serviceStatusIdle {
-		log.Debug().Msgf("Service %d is in schedule", to)
-		p.setStatus(to, serviceStatusSchedule)
-		task.scheduleBack(to)
-		return
-	}
-	sockId := task.services.getSockevent(to)
-	if sockId < 0 {
-		return
-	}
-	log.Debug().Msgf("Trigger sockevent of service %d", to)
-	task.event[sockId].trigger()
-}
-
-func (task *ltask) scheduleBack(id serviceId) {
-	if !task.schedule.Push(int(id)) {
-		panic("schedule channel is full")
-	}
 }
 
 func (p *servicePool) initSockevent(id serviceId, index int64) {
@@ -468,29 +444,6 @@ func initService(L *lua.State) int {
 	return 0
 }
 
-func pushString(L *lua.State) int {
-	msg := *(*string)(L.ToUserData(-1))
-	L.SetTop(1)
-	L.PushString(msg)
-	return 1
-}
-
-func errorMessage(fromL, toL *lua.State, msg string) {
-	if toL == nil {
-		return
-	}
-	if fromL != nil {
-		errMsg := fromL.ToString(-1)
-		toL.PushGoFunction(pushString)
-		toL.PushLightUserData(unsafe.Pointer(&errMsg))
-		if toL.PCall(1, 1, 0) == nil {
-			return
-		}
-		toL.Pop(1)
-	}
-	toL.PushLightUserData(unsafe.Pointer(&msg))
-}
-
 func (p *servicePool) closeServiceMessages(L *lua.State, id serviceId) (reportError int) {
 	var index int
 	for {
@@ -524,45 +477,4 @@ func (p *servicePool) deleteService(id serviceId) {
 	s.close()
 	malloc.Free(unsafe.Pointer(s))
 	p.s[id&p.mask] = nil
-}
-
-func requireModule(L *lua.State) int {
-	name := *(*string)(L.ToUserData(1))
-	fn := *(*lua.GoFunc)(L.ToUserData(2))
-	L.Requiref(name, fn, false)
-	return 0
-}
-
-func (task *ltask) initService(L *lua.State, id serviceId, label string,
-	source string, chunkName string, workerId int32) (ok bool) {
-	// FIXME: free memory of ud when service is delete
-	ptr := mem.Alloc(uint(unsafe.Sizeof(serviceUd{})))
-	ud := (*serviceUd)(unsafe.Pointer(ptr))
-	ud.task = task
-	ud.id = id
-	s := task.services.getService(id)
-	if s == nil {
-		L.PushString(fmt.Sprintf("Service %d not found", id))
-		return
-	}
-	defer func() {
-		if !ok {
-			task.services.deleteService(id)
-		}
-	}()
-	if !s.init(task.luaLib, ud, task.services.queueLen, L) || !s.requiref("ltask", ltaskOpen, L) {
-		L.PushString(fmt.Sprintf("New service fail: %s", getErrorMessage(L)))
-		return
-	}
-	s.setBinding(workerId)
-	if !s.setLabel(label) {
-		L.PushString(fmt.Sprintf("Set label fail: %s", getErrorMessage(L)))
-		return
-	}
-	if err := s.loadString(source, chunkName); err != nil {
-		L.PushString(fmt.Sprintf("%s", err))
-		return
-	}
-	ok = true
-	return
 }

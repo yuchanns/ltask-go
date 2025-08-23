@@ -13,8 +13,7 @@ import (
 )
 
 func getPtr[T any](L *lua.State, key string) *T {
-	typ, _ := L.GetField(lua.LUA_REGISTRYINDEX, key)
-	if typ == lua.LUA_TNIL {
+	if L.GetField(lua.LUA_REGISTRYINDEX, key) == lua.LUA_TNIL {
 		L.Errorf("%s is absense", key)
 		return nil
 	}
@@ -53,21 +52,20 @@ func ltaskInit(L *lua.State) int {
 	if L.GetTop() == 0 {
 		L.NewTable()
 	}
-	typ, _ := L.GetField(lua.LUA_REGISTRYINDEX, "LTASK_CONFIG")
-	if typ != lua.LUA_TNIL {
+	if L.GetField(lua.LUA_REGISTRYINDEX, "LTASK_CONFIG") != lua.LUA_TNIL {
 		return L.Errorf("Already init")
 	}
 	L.Pop(1)
 
 	var config *ltaskConfig
 	config = (*ltaskConfig)(L.NewUserDataUv(int(unsafe.Sizeof(*config)), 0))
-	_ = L.SetField(lua.LUA_REGISTRYINDEX, "LTASK_CONFIG")
+	L.SetField(lua.LUA_REGISTRYINDEX, "LTASK_CONFIG")
 
 	config.load(L, 1)
 
-	if config.crashLog != nil {
-		// TODO: set crash log
-	}
+	// if config.crashLog != nil {
+	// TODO: set crash log
+	// }
 
 	var task *ltask
 	luaLib := (*lua.Lib)(L.ToUserData(L.UpValueIndex(1)))
@@ -91,11 +89,6 @@ func ltaskBootPushLog(L *lua.State) int {
 type timerEvent struct {
 	session session
 	id      serviceId
-}
-
-type timerUpdateUd struct {
-	L *lua.State
-	n int
 }
 
 var centisecond = time.Duration(10 * time.Millisecond)
@@ -147,8 +140,7 @@ func ltaskInitRoot(L *lua.State) int {
 }
 
 func checkField(L *lua.State, index int, key string) int64 {
-	typ, _ := L.GetField(index, key)
-	if typ != lua.LUA_TNUMBER {
+	if L.GetField(index, key) != lua.LUA_TNUMBER {
 		return int64(L.Errorf(".%s should be an integer", key))
 	}
 	v := L.ToInteger(-1)
@@ -225,7 +217,7 @@ func lpostMessage(L *lua.State) int {
 		session: session(checkField(L, 1, "session")),
 		typ:     int(checkField(L, 1, "type")),
 	})
-	typ, _ := L.GetField(1, "message")
+	typ := L.GetField(1, "message")
 	if typ != lua.LUA_TNIL {
 		if typ != lua.LUA_TLIGHTUSERDATA {
 			return L.Errorf(".message should be a pointer")

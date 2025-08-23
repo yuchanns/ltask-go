@@ -6,6 +6,7 @@ import (
 	"net"
 	"syscall"
 
+	"github.com/phuslu/log"
 	"golang.org/x/sys/unix"
 )
 
@@ -18,7 +19,12 @@ func fdGet(tcpConn *net.TCPConn) (fd int, err error) {
 	if err != nil {
 		return
 	}
-	defer file.Close()
+	defer func() {
+		err := file.Close()
+		if err != nil {
+			log.Debug().Msgf("fdGet: close file failed: %s", err)
+		}
+	}()
 	fd, err = fdDup(int(file.Fd()))
 	return
 }
@@ -33,8 +39,8 @@ func newConn(fd int) *conn {
 	}
 }
 
-func (c *conn) close() {
-	unix.Close(c.fd)
+func (c *conn) close() (err error) {
+	return unix.Close(c.fd)
 }
 
 func (c *conn) write(b []byte) (n int, err error) {

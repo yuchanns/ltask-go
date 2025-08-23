@@ -249,8 +249,7 @@ func (wb *writeBlock) lookupRef(L *lua.State, obj unsafe.Pointer) int {
 		}
 		return 0
 	} else {
-		typ, _ := L.RawGetP(s.refIndex, obj)
-		if typ != lua.LUA_TNUMBER {
+		if L.RawGetP(s.refIndex, obj) != lua.LUA_TNUMBER {
 			L.Pop(1)
 			return 0
 		}
@@ -347,8 +346,7 @@ func (wb *writeBlock) packTableMetaPairs(L *lua.State, index int) {
 		L.PushValue(-2)
 		L.Copy(-5, -3)
 		L.Call(2, 2)
-		typ := L.Type(-2)
-		if typ == lua.LUA_TNIL {
+		if L.Type(-2) == lua.LUA_TNIL {
 			L.Pop(4)
 			break
 		}
@@ -367,8 +365,7 @@ func (wb *writeBlock) packTable(L *lua.State, index int) {
 
 	wb.markTable(L, index)
 
-	typ, _ := L.GetMetaField(index, "__pairs")
-	if typ != lua.LUA_TNIL {
+	if L.GetMetaField(index, "__pairs") != lua.LUA_TNIL {
 		wb.packTableMetaPairs(L, index)
 	} else {
 		arraySize := wb.packTableArray(L, index)
@@ -378,7 +375,7 @@ func (wb *writeBlock) packTable(L *lua.State, index int) {
 
 func (wb *writeBlock) packOne(L *lua.State, index int) {
 	typ := L.Type(index)
-	switch typ {
+	switch L.Type(index) {
 	case lua.LUA_TNIL:
 		wb.writeNil()
 	case lua.LUA_TNUMBER:
@@ -680,12 +677,13 @@ func (rb *readBlock) pushValue(L *lua.State, typ, cookie uint8) {
 			L.PushInteger(rb.getInteger(L, cookie))
 		}
 	case serdeTypeUserData:
-		if cookie == serdeTypeUserDataPointer {
+		switch cookie {
+		case serdeTypeUserDataPointer:
 			L.PushLightUserData(rb.getPointer(L))
-		} else if cookie == serdeTypeUserDataCFunc {
+		case serdeTypeUserDataCFunc:
 			fn := rb.getPointer(L)
 			L.PushCFunction(fn)
-		} else {
+		default:
 			L.Errorf("Invalid userdata")
 		}
 	case serdeTypeShortString:
@@ -693,19 +691,20 @@ func (rb *readBlock) pushValue(L *lua.State, typ, cookie uint8) {
 		L.PushString(str)
 	case serdeTypeLongString:
 		var length int
-		if cookie == 2 {
+		switch cookie {
+		case 2:
 			if l, ok := rb.readUint16(); ok {
 				length = int(l)
 			} else {
 				L.Errorf("Invalid serialize stream")
 			}
-		} else if cookie == 4 {
+		case 4:
 			if l, ok := rb.readUint32(); ok {
 				length = int(l)
 			} else {
 				L.Errorf("Invalid serialize stream")
 			}
-		} else {
+		default:
 			L.Errorf("Invalid serialize stream")
 		}
 		str := rb.getBuffer(L, length)
