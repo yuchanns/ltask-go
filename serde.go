@@ -249,8 +249,7 @@ func (wb *writeBlock) lookupRef(L *lua.State, obj unsafe.Pointer) int {
 		}
 		return 0
 	} else {
-		typ, _ := L.RawGetP(s.refIndex, obj)
-		if typ != lua.LUA_TNUMBER {
+		if L.RawGetP(s.refIndex, obj) != lua.LUA_TNUMBER {
 			L.Pop(1)
 			return 0
 		}

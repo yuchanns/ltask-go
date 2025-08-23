@@ -35,7 +35,10 @@ func (s *sockEvent) open() (ok bool) {
 		}
 	}
 	defer func() {
-		listener.Close()
+		err := listener.Close()
+		if err != nil {
+			log.Debug().Msgf("sockEvent: close listener failed: %s", err)
+		}
 		if !ok {
 			s.close()
 		}
@@ -60,12 +63,22 @@ func (s *sockEvent) open() (ok bool) {
 		log.Debug().Msgf("sockEvent: dial %s failed: %v", addr.String(), err)
 		return
 	}
-	defer writeConn.Close()
+	defer func() {
+		err := writeConn.Close()
+		if err != nil {
+			log.Debug().Msgf("sockEvent: close writeConn failed: %s", err)
+		}
+	}()
 
 	var readConn net.Conn
 	select {
 	case readConn = <-connChan:
-		defer readConn.Close()
+		defer func() {
+			err := readConn.Close()
+			if err != nil {
+				log.Debug().Msgf("sockEvent: close readConn failed: %s", err)
+			}
+		}()
 	case err = <-errChan:
 		log.Debug().Msgf("sockEvent: accept %s failed: %v", addr.String(), err)
 		return
@@ -94,11 +107,17 @@ func (s *sockEvent) open() (ok bool) {
 func (s *sockEvent) close() {
 	if s.pipe[0] != socketInvalid {
 		conn := newConn(s.pipe[0])
-		conn.close()
+		err := conn.close()
+		if err != nil {
+			log.Debug().Msgf("sockEvent: close pipe[0] failed: %s", err)
+		}
 	}
 	if s.pipe[1] != socketInvalid {
 		conn := newConn(s.pipe[1])
-		conn.close()
+		err := conn.close()
+		if err != nil {
+			log.Debug().Msgf("sockEvent: close pipe[1] failed: %s", err)
+		}
 	}
 }
 
