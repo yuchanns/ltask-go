@@ -68,8 +68,7 @@ func (task *ltask) init(L *lua.State, config *ltaskConfig, luaLib *lua.Lib) {
 		task.externalMessage = xxchan.Make[unsafe.Pointer](ptr, int(config.externalQueue))
 	}
 
-	typ := L.GetField(1, "debuglog")
-	if typ == lua.LUA_TSTRING {
+	if L.GetField(1, "debuglog") == lua.LUA_TSTRING {
 		logFile := L.ToString(-1)
 		if logFile != "=" {
 		}

@@ -19,8 +19,7 @@ func ltaskRootOpen(L *lua.State) int {
 
 	L.NewLibTable(l)
 
-	typ := L.GetField(lua.LUA_REGISTRYINDEX, "LTASK_ID")
-	if typ != lua.LUA_TLIGHTUSERDATA {
+	if L.GetField(lua.LUA_REGISTRYINDEX, "LTASK_ID") != lua.LUA_TLIGHTUSERDATA {
 		return L.Errorf("No service id, the VM is not inited by ltask")
 	}
 	ud := (*serviceUd)(L.ToUserData(-1))

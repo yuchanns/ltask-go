@@ -347,8 +347,7 @@ func (wb *writeBlock) packTableMetaPairs(L *lua.State, index int) {
 		L.PushValue(-2)
 		L.Copy(-5, -3)
 		L.Call(2, 2)
-		typ := L.Type(-2)
-		if typ == lua.LUA_TNIL {
+		if L.Type(-2) == lua.LUA_TNIL {
 			L.Pop(4)
 			break
 		}
@@ -367,8 +366,7 @@ func (wb *writeBlock) packTable(L *lua.State, index int) {
 
 	wb.markTable(L, index)
 
-	typ := L.GetMetaField(index, "__pairs")
-	if typ != lua.LUA_TNIL {
+	if L.GetMetaField(index, "__pairs") != lua.LUA_TNIL {
 		wb.packTableMetaPairs(L, index)
 	} else {
 		arraySize := wb.packTableArray(L, index)
@@ -378,7 +376,7 @@ func (wb *writeBlock) packTable(L *lua.State, index int) {
 
 func (wb *writeBlock) packOne(L *lua.State, index int) {
 	typ := L.Type(index)
-	switch typ {
+	switch L.Type(index) {
 	case lua.LUA_TNIL:
 		wb.writeNil()
 	case lua.LUA_TNUMBER:

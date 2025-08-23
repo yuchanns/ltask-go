@@ -13,8 +13,7 @@ import (
 )
 
 func getPtr[T any](L *lua.State, key string) *T {
-	typ := L.GetField(lua.LUA_REGISTRYINDEX, key)
-	if typ == lua.LUA_TNIL {
+	if L.GetField(lua.LUA_REGISTRYINDEX, key) == lua.LUA_TNIL {
 		L.Errorf("%s is absense", key)
 		return nil
 	}
@@ -53,8 +52,7 @@ func ltaskInit(L *lua.State) int {
 	if L.GetTop() == 0 {
 		L.NewTable()
 	}
-	typ := L.GetField(lua.LUA_REGISTRYINDEX, "LTASK_CONFIG")
-	if typ != lua.LUA_TNIL {
+	if L.GetField(lua.LUA_REGISTRYINDEX, "LTASK_CONFIG") != lua.LUA_TNIL {
 		return L.Errorf("Already init")
 	}
 	L.Pop(1)
@@ -147,8 +145,7 @@ func ltaskInitRoot(L *lua.State) int {
 }
 
 func checkField(L *lua.State, index int, key string) int64 {
-	typ := L.GetField(index, key)
-	if typ != lua.LUA_TNUMBER {
+	if L.GetField(index, key) != lua.LUA_TNUMBER {
 		return int64(L.Errorf(".%s should be an integer", key))
 	}
 	v := L.ToInteger(-1)
