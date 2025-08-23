@@ -41,7 +41,7 @@ func ltaskOpen(L *lua.State) int {
 		{Name: "eventinit", Func: ltaskEventInit},
 	}
 
-	typ, _ := L.GetField(lua.LUA_REGISTRYINDEX, "LTASK_ID")
+	typ := L.GetField(lua.LUA_REGISTRYINDEX, "LTASK_ID")
 	if typ != lua.LUA_TLIGHTUSERDATA {
 		L.Errorf("No service id, the VM is not inited by ltask")
 	}

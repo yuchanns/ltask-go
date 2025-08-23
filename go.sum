@@ -12,8 +12,8 @@ github.com/smasher164/mem v0.0.0-20200311200026-6e9ed23f934d h1:mBNo8YH7ixGv5W5b
 github.com/smasher164/mem v0.0.0-20200311200026-6e9ed23f934d/go.mod h1:ra1FWopV+/zvI7SoWUugoWlwkSW22mWdxU0aW+eZVG8=
 github.com/stretchr/testify v1.10.0 h1:Xv5erBjTwe/5IxqUQTdXv5kgmIvbHo3QQyRwhJsOfJA=
 github.com/stretchr/testify v1.10.0/go.mod h1:r2ic/lqez/lEtzL7wO/rwa5dbSLXVDPFyf8C91i36aY=
-go.yuchanns.xyz/lua v0.0.0-20250818034944-7c014dc9ed87 h1:vAOa1LEKSnQirHDH0Nue4FHKdwmnh5W5AaZz/HR1LM0=
-go.yuchanns.xyz/lua v0.0.0-20250818034944-7c014dc9ed87/go.mod h1:N0mJum5yuk1tszlcVuZ1v/+31IUuOOng2oQ8eyPMVI8=
+go.yuchanns.xyz/lua v0.0.0-20250823072606-427e34566b38 h1:CVA/iOo6ROgSEnINhfP3DiSBDHdNMjyO2UT4jEF7XIY=
+go.yuchanns.xyz/lua v0.0.0-20250823072606-427e34566b38/go.mod h1:N0mJum5yuk1tszlcVuZ1v/+31IUuOOng2oQ8eyPMVI8=
 go.yuchanns.xyz/timefall v0.1.0 h1:LGRBPW8qXeGQFWLFN2esns6x2pe12QxM/MIGou4qoBU=
 go.yuchanns.xyz/timefall v0.1.0/go.mod h1:23LIkzY6IqM8GxLglCVpaPAyZ3u77seVezRB6g9moHc=
 go.yuchanns.xyz/xxchan v0.1.0 h1:0ZjPsmoYPqWHPm5siMMjLai9XYv8kUt06l0WCBYR5BA=

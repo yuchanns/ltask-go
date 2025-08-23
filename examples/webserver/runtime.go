@@ -52,8 +52,8 @@ func externalOpenLibs(L *lua.State) {
 	L.FFI().LuaLOpenlibs = func(luaL unsafe.Pointer) {
 		luaLOpenLibs(luaL)
 		L := clone(luaL)
-		_ = L.GetGlobal("package")
-		_, _ = L.GetField(-1, "preload")
+		L.GetGlobal("package")
+		_ = L.GetField(-1, "preload")
 		L.SetFuncs(l, 0)
 		L.Pop(2)
 	}

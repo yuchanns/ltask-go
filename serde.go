@@ -367,7 +367,7 @@ func (wb *writeBlock) packTable(L *lua.State, index int) {
 
 	wb.markTable(L, index)
 
-	typ, _ := L.GetMetaField(index, "__pairs")
+	typ := L.GetMetaField(index, "__pairs")
 	if typ != lua.LUA_TNIL {
 		wb.packTableMetaPairs(L, index)
 	} else {

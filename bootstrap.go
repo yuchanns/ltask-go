@@ -13,7 +13,7 @@ import (
 )
 
 func getPtr[T any](L *lua.State, key string) *T {
-	typ, _ := L.GetField(lua.LUA_REGISTRYINDEX, key)
+	typ := L.GetField(lua.LUA_REGISTRYINDEX, key)
 	if typ == lua.LUA_TNIL {
 		L.Errorf("%s is absense", key)
 		return nil
@@ -53,7 +53,7 @@ func ltaskInit(L *lua.State) int {
 	if L.GetTop() == 0 {
 		L.NewTable()
 	}
-	typ, _ := L.GetField(lua.LUA_REGISTRYINDEX, "LTASK_CONFIG")
+	typ := L.GetField(lua.LUA_REGISTRYINDEX, "LTASK_CONFIG")
 	if typ != lua.LUA_TNIL {
 		return L.Errorf("Already init")
 	}
@@ -61,7 +61,7 @@ func ltaskInit(L *lua.State) int {
 
 	var config *ltaskConfig
 	config = (*ltaskConfig)(L.NewUserDataUv(int(unsafe.Sizeof(*config)), 0))
-	_ = L.SetField(lua.LUA_REGISTRYINDEX, "LTASK_CONFIG")
+	L.SetField(lua.LUA_REGISTRYINDEX, "LTASK_CONFIG")
 
 	config.load(L, 1)
 
@@ -147,7 +147,7 @@ func ltaskInitRoot(L *lua.State) int {
 }
 
 func checkField(L *lua.State, index int, key string) int64 {
-	typ, _ := L.GetField(index, key)
+	typ := L.GetField(index, key)
 	if typ != lua.LUA_TNUMBER {
 		return int64(L.Errorf(".%s should be an integer", key))
 	}
@@ -225,7 +225,7 @@ func lpostMessage(L *lua.State) int {
 		session: session(checkField(L, 1, "session")),
 		typ:     int(checkField(L, 1, "type")),
 	})
-	typ, _ := L.GetField(1, "message")
+	typ := L.GetField(1, "message")
 	if typ != lua.LUA_TNIL {
 		if typ != lua.LUA_TLIGHTUSERDATA {
 			return L.Errorf(".message should be a pointer")

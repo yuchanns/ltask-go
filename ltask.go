@@ -26,8 +26,8 @@ func init() {
 }
 
 func OpenLibs(L *lua.State, lib *lua.Lib) {
-	_ = L.GetGlobal("package")
-	_, _ = L.GetField(-1, "preload")
+	L.GetGlobal("package")
+	_ = L.GetField(-1, "preload")
 
 	L.PushLightUserData(lib)
 

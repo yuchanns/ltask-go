@@ -72,7 +72,7 @@ func (config *ltaskConfig) load(L *lua.State, index int) {
 }
 
 func configGetInit(L *lua.State, index int, key string, opt int64) int64 {
-	typ, _ := L.GetField(index, key)
+	typ := L.GetField(index, key)
 	if typ == lua.LUA_TNIL {
 		L.Pop(1)
 		return opt
