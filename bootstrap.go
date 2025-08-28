@@ -4,7 +4,6 @@ import (
 	"embed"
 	"runtime"
 	"sync"
-	"sync/atomic"
 	"time"
 	"unsafe"
 
@@ -133,7 +132,7 @@ func ltaskInitRoot(L *lua.State) int {
 	if s == nil {
 		return L.Errorf("Service %d not found", id)
 	}
-	if !s.requiref("ltask.root", ltaskRootOpen, L) {
+	if !s.requiref("ltask.root", OpenRoot, L) {
 		return L.Errorf("Require ltask.root failed: %s", getErrorMessage(L))
 	}
 	return 0
@@ -327,40 +326,4 @@ func ltaskDeinit(L *lua.State) int {
 	L.PushNil()
 	L.SetField(lua.LUA_REGISTRYINDEX, "LTASK_GLOBAL")
 	return 0
-}
-
-var bootInit atomic.Int32
-
-func ltaskBootstrapOpen(L *lua.State) int {
-	if bootInit.Add(1) != 1 {
-		return L.Errorf("ltask.bootstrap can only require once")
-	}
-	l := []*lua.Reg{
-		{Name: "searchpath", Func: ltaskSearchPath},
-		{Name: "readfile", Func: ltaskReadFile},
-		{Name: "loadfile", Func: ltaskLoadFile},
-		{Name: "dofile", Func: ltaskDoFile},
-		{Name: "deinit", Func: ltaskDeinit},
-		{Name: "run", Func: ltaskRun},
-		{Name: "wait", Func: ltaskWait},
-		{Name: "post_message", Func: lpostMessage},
-		{Name: "new_service", Func: ltaskNewService},
-		{Name: "init_timer", Func: ltaskInitTimer},
-		{Name: "init_root", Func: ltaskInitRoot},
-		{Name: "pushlog", Func: ltaskBootPushLog},
-		// We don't need `init_socket` here, as it is proceed by Go runtime automatically.
-		{Name: "pack", Func: LuaSerdePack},
-		{Name: "unpack", Func: LuaSerdeUnpack},
-		{Name: "remove", Func: LuaSerdeRemove},
-		{Name: "unpack_remove", Func: LuaSerdeUnpackRemove},
-	}
-
-	L.NewLib(l)
-
-	L.PushLightUserData(L.ToUserData(L.UpValueIndex(1)))
-	l2 := []*lua.Reg{
-		{Name: "init", Func: ltaskInit},
-	}
-	L.SetFuncs(l2, 1)
-	return 1
 }

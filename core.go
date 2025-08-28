@@ -439,7 +439,7 @@ func (task *ltask) initService(L *lua.State, id serviceId, label string,
 			task.services.deleteService(id)
 		}
 	}()
-	if !s.init(task.luaLib, ud, task.services.queueLen, L) || !s.requiref("ltask", ltaskOpen, L) {
+	if !s.init(task.luaLib, ud, task.services.queueLen, L) || !s.requiref("ltask", OpenCore, L) {
 		L.PushString(fmt.Sprintf("New service fail: %s", getErrorMessage(L)))
 		return
 	}
