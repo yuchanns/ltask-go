@@ -5,14 +5,19 @@ lm:source_set("source_sokol")({
     lm.base_dir .. "/3rd/sokol",
   },
   sources = {
-    "./dummy.c",
+    lm.os == "macos" and "./dummy.m" or "./dummy.c",
+  },
+  flags = {
+    "-Wno-unknown-pragmas",
+    "-fPIC",
   },
   visibility = "default",
-  linux = {
-    flags = {
-      "-Wno-unknown-pragmas",
-      "-fPIC",
+  macos = {
+    defines = {
+      "SOKOL_METAL",
     },
+  },
+  linux = {
     defines = {
       "SOKOL_GLCORE",
     },

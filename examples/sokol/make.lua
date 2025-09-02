@@ -22,6 +22,16 @@ lm:dll("clibs")({
       "m",
     },
   },
+  macos = {
+    frameworks = {
+      "Cocoa",
+      "QuartzCore",
+      "Metal",
+      "MetalKit",
+      "OpenGL",
+      "AudioToolbox",
+    },
+  },
 })
 
 lm:phony("all")({

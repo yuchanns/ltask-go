@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"runtime"
-	"time"
 	"unsafe"
 
 	"github.com/ebitengine/purego"
@@ -63,7 +62,6 @@ func initCb() {
 
 func frameCb() {
 	fmt.Println("frame")
-	time.Sleep(time.Second)
 }
 
 func cleanupCb() {
