@@ -13,7 +13,6 @@ import (
 )
 
 type ltask struct {
-	luaLib              *lua.Lib
 	config              *ltaskConfig
 	workers             []workerThread
 	eventInit           [maxSockEvent]atomicInt
@@ -48,7 +47,7 @@ func (task *ltask) pushLog(id serviceId, data unsafe.Pointer, sz int64) (ok bool
 	})
 }
 
-func (task *ltask) init(L *lua.State, config *ltaskConfig, luaLib *lua.Lib) {
+func (task *ltask) init(L *lua.State, config *ltaskConfig) {
 	task = (*ltask)(L.NewUserDataUv(int(unsafe.Sizeof(*task)), 0))
 	L.SetField(lua.LUA_REGISTRYINDEX, "LTASK_GLOBAL")
 	task.lqueue = newLogQueue()
@@ -61,7 +60,6 @@ func (task *ltask) init(L *lua.State, config *ltaskConfig, luaLib *lua.Lib) {
 	task.schedule = xxchan.Make[int](ptr, int(config.maxService))
 	task.timer = nil
 	task.externalMessage = nil
-	task.luaLib = luaLib
 
 	if config.externalQueue > 0 {
 		ptr := malloc.Alloc(uint(xxchan.Sizeof[unsafe.Pointer](int(config.externalQueue))))
@@ -439,7 +437,7 @@ func (task *ltask) initService(L *lua.State, id serviceId, label string,
 			task.services.deleteService(id)
 		}
 	}()
-	if !s.init(task.luaLib, ud, task.services.queueLen, L) || !s.requiref("ltask", OpenCore, L) {
+	if !s.init(ud, task.services.queueLen, L) || !s.requiref("ltask", OpenCore, L) {
 		L.PushString(fmt.Sprintf("New service fail: %s", getErrorMessage(L)))
 		return
 	}

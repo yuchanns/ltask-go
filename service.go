@@ -53,10 +53,10 @@ type service struct {
 	clock         uint64
 }
 
-func (s *service) init(luaLib *lua.Lib, ud *serviceUd, queueLen int64, pL *lua.State) (ok bool) {
+func (s *service) init(ud *serviceUd, queueLen int64, pL *lua.State) (ok bool) {
 	// TODO: compatible 505
 	// malloc
-	L, err := luaLib.NewState()
+	L, err := lua.NewWithFFI(pL.FFI()).NewState()
 	if err != nil {
 		return
 	}

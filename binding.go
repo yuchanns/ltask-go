@@ -8,16 +8,14 @@ import (
 
 // OpenLibs opens ltask library.
 // This is useful when you don't write Go code and just want to use ltask directly in Lua.
-func OpenLibs(L *lua.State, lib *lua.Lib) {
+func OpenLibs(L *lua.State) {
 	L.GetGlobal("package")
 	_ = L.GetField(-1, "preload")
-
-	L.PushLightUserData(lib)
 
 	l := []*lua.Reg{
 		{Name: "ltask.bootstrap", Func: OpenBootstrap},
 	}
-	L.SetFuncs(l, 1)
+	L.SetFuncs(l, 0)
 	L.Pop(2)
 }
 

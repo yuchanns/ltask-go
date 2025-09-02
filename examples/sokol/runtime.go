@@ -5,6 +5,7 @@ import (
 	"unsafe"
 
 	"github.com/ebitengine/purego"
+	"go.yuchanns.xyz/lua"
 )
 
 type sappDesc struct {
@@ -17,11 +18,16 @@ type sappDesc struct {
 }
 
 type externalFFI struct {
-	SappRun func(unsafe.Pointer) `ffi:"sapp_run"`
+	Lib *lua.Lib
+
+	SappRun       func(unsafe.Pointer) `ffi:"sapp_run"`
+	SappQuit      func()               `ffi:"sapp_quit"`
+	SargsShutdown func()               `ffi:"sargs_shutdown"`
 }
 
-func loadFFI(lib uintptr) *externalFFI {
-	var effi externalFFI
+var effi externalFFI
+
+func loadExternalFFI(lib *lua.Lib) {
 	t := reflect.TypeOf(&effi).Elem()
 	v := reflect.ValueOf(&effi).Elem()
 	for i := range t.NumField() {
@@ -34,7 +40,7 @@ func loadFFI(lib uintptr) *externalFFI {
 			continue
 		}
 		fptr := v.Field(i).Addr().Interface()
-		purego.RegisterLibFunc(fptr, lib, fname)
+		purego.RegisterLibFunc(fptr, lib.FFI().Lib(), fname)
 	}
-	return &effi
+	effi.Lib = lib
 }

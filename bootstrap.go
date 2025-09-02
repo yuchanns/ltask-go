@@ -68,8 +68,7 @@ func ltaskInit(L *lua.State) int {
 	// }
 
 	var task *ltask
-	luaLib := (*lua.Lib)(L.ToUserData(L.UpValueIndex(1)))
-	task.init(L, config, luaLib)
+	task.init(L, config)
 
 	return 1
 }
