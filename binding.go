@@ -92,6 +92,7 @@ func OpenBootstrap(L *lua.State) int {
 		{Name: "unpack", Func: LuaSerdeUnpack},
 		{Name: "remove", Func: LuaSerdeRemove},
 		{Name: "unpack_remove", Func: LuaSerdeUnpackRemove},
+		{Name: "external_sender", Func: ltaskExternalSender},
 	}
 
 	L.NewLib(l)
