@@ -56,18 +56,22 @@ func init() {
 	runtime.LockOSThread()
 }
 
-func initCb() {
+func initCb() int {
 	fmt.Println("init")
+	return 0
 }
 
-func frameCb() {
+func frameCb() int {
 	fmt.Println("frame")
+	return 0
 }
 
-func cleanupCb() {
+func cleanupCb() int {
 	fmt.Println("cleanup")
+	return 0
 }
 
-func eventCb(ev unsafe.Pointer) {
+func eventCb(ev unsafe.Pointer) int {
 	fmt.Println("event", ev)
+	return 0
 }

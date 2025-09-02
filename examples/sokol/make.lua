@@ -32,6 +32,16 @@ lm:dll("clibs")({
       "AudioToolbox",
     },
   },
+  windows = {
+    links = {
+      "kernel32",
+      "user32",
+      "shell32",
+      "gdi32",
+      "dxgi",
+      "d3d11",
+    },
+  },
 })
 
 lm:phony("all")({

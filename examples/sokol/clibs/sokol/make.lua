@@ -8,10 +8,21 @@ lm:source_set("source_sokol")({
     lm.os == "macos" and "./dummy.m" or "./dummy.c",
   },
   flags = {
-    "-Wno-unknown-pragmas",
-    "-fPIC",
+    lm.os ~= "windows" and "-Wno-unknown-pragmas" or "-wd4068",
+    lm.os ~= "windows" and "-fPIC",
+  },
+  msvc = {
+    flags = {
+      "/utf-8",
+    },
   },
   visibility = "default",
+  windows = {
+    defines = {
+      "SOKOL_D3D11",
+      "SOKOL_DLL",
+    },
+  },
   macos = {
     defines = {
       "SOKOL_METAL",
