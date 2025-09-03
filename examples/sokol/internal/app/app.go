@@ -96,14 +96,6 @@ func pmain(L *lua.State) int {
 	return 1
 }
 
-func setFunction(L *lua.State, key string, idx int) (err error) {
-	if L.GetField(-1, key) != lua.LUA_TFUNCTION {
-		return fmt.Errorf("missing function: %s", key)
-	}
-	L.Insert(idx)
-	return
-}
-
 func (ctx *Context) start() (err error) {
 	L, err := ctx.Lib.NewState()
 	if err != nil {
@@ -128,24 +120,34 @@ func (ctx *Context) start() (err error) {
 	return
 }
 
+type callbackFn struct {
+	name string
+	idx  int
+}
+
+func (cb callbackFn) install(L *lua.State) (err error) {
+	if L.GetField(-1, cb.name) != lua.LUA_TFUNCTION {
+		err = fmt.Errorf("missing function: %s", cb.name)
+		return
+	}
+	L.Insert(cb.idx)
+	return
+}
+
 func (ctx *Context) initCallback() (err error) {
 	L := ctx.L
 	if L.Type(-1) != lua.LUA_TTABLE {
-		err = fmt.Errorf("error running pmain: must return a table", err)
+		err = fmt.Errorf("error running pmain: must return a table")
 		return
 	}
 
-	type callbackFn struct {
-		name string
-		idx  int
-	}
 	callbackFns := []callbackFn{
 		{name: "frame", idx: FrameCallback},
 		{name: "event", idx: EventCallback},
 		{name: "cleanup", idx: CleanupCallback},
 	}
 	for _, cb := range callbackFns {
-		if err = setFunction(L, cb.name, cb.idx); err != nil {
+		if err = cb.install(L); err != nil {
 			return
 		}
 	}
