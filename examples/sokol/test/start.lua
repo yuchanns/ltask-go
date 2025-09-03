@@ -66,12 +66,13 @@ return ltask.loadfile(filename)
   print("ltask Start")
   waitfunc = function() bootstrap.wait(ctx) end
 
-  local sender = boot.external_sender(ctx)
-  local function send_message(...) sender(ctx, ...) end
+  local sender, sender_ud = boot.external_sender(ctx)
+  local sendmessage = require("sapp").sendmessage
+  local function send_message(...) sendmessage(sender, sender_ud, ...) end
 
   return {
     cleanup = function() send_message("cleanup") end,
-    frame = function(count) send_message("frame") end,
+    frame = function(count) send_message("frame", count) end,
     event = function(...) send_message("event") end,
   }
 end

@@ -74,6 +74,7 @@ func msgHandler(L *lua.State) int {
 }
 
 func pmain(L *lua.State) int {
+	externalOpenLibs(L)
 	L.OpenLibs()
 	ltask.OpenLibs(L)
 	args := pflag.Args()
