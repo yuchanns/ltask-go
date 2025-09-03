@@ -1,6 +1,6 @@
 # ltask-go
 
-A showcase of how to build a lua library with [go.yuchanns.xyz/lua](https://github.com/yuchanns/lua) the lua go-binding.
+A rewrite of [cloudwu/ltask](https://github.com/cloudwu/ltask) in Go.
 
 ## Caution
 
@@ -95,6 +95,10 @@ end
 
 boot()
 ```
+
+### Examples
+
+More examples can be found in the [`examples`](./examples) directory. e.g. integration with [sokol-app](./examples/sokol).
 
 ### Devlopment
 
