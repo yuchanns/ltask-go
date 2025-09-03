@@ -764,26 +764,6 @@ func serdePack(L *lua.State, from int) []byte {
 	return wb.Bytes()
 }
 
-func serdeUnpackPtr(L *lua.State, buffer unsafe.Pointer) int {
-	top := L.GetTop()
-
-	length := binary.LittleEndian.Uint32(unsafe.Slice((*byte)(unsafe.Pointer(buffer)), 4))
-	data := unsafe.Slice((*byte)(unsafe.Add(buffer, 4)), int(length))
-
-	defer malloc.Free(buffer)
-
-	L.PushGoFunction(func(L *lua.State) int {
-		return serdeUnpack(L, data)
-	})
-
-	err := L.PCall(0, lua.LUA_MULTRET, 0)
-	if err != nil {
-		return L.Errorf("%s", err)
-	}
-
-	return L.GetTop() - top
-}
-
 func alignUp(n, align int) int {
 	return (n + align - 1) &^ (align - 1)
 }
@@ -827,12 +807,17 @@ func LuaSerdeUnpackRemove(L *lua.State) int {
 		return 0
 	}
 
-	buffer := L.ToUserData(1)
-	if buffer == nil {
-		return 0
-	}
+	L.SetTop(1)
 
-	return serdeUnpackPtr(L, buffer)
+	buffer := L.ToUserData(1)
+	defer malloc.Free(buffer)
+
+	L.SetTop(0)
+
+	length := binary.LittleEndian.Uint32(unsafe.Slice((*byte)(unsafe.Pointer(buffer)), 4))
+	data := unsafe.Slice((*byte)(unsafe.Add(buffer, 4)), int(length))
+
+	return serdeUnpack(L, data)
 }
 
 func LuaSerdeRemove(L *lua.State) int {
