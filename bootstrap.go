@@ -9,7 +9,6 @@ import (
 
 	"go.yuchanns.xyz/lua"
 	"go.yuchanns.xyz/timefall"
-	"go.yuchanns.xyz/xxchan"
 )
 
 func getPtr[T any](L *lua.State, key string) *T {
@@ -335,12 +334,19 @@ func ltaskExternalSender(L *lua.State) int {
 	if task.externalMessage == nil {
 		return L.Errorf("No external message queue")
 	}
-	L.PushLightUserData(&externalSend)
-	L.PushLightUserData(task.externalMessage)
-	return 2
-}
+	L.PushGoFunction(func(L *lua.State) int {
+		L.CheckType(1, lua.LUA_TUSERDATA)
+		ctx := (*taskContext)(L.ToUserData(1))
+		var what unsafe.Pointer
+		if L.Type(2) == lua.LUA_TSTRING {
+			what = unsafe.Pointer(&[]byte(L.ToString(2))[0])
+		} else {
+			L.CheckType(2, lua.LUA_TLIGHTUSERDATA)
+			what = L.ToUserData(2)
+		}
+		ctx.task.externalMessage.Push(what)
 
-var externalSend = func(q unsafe.Pointer, v unsafe.Pointer) (ok bool) {
-	queue := (*xxchan.Channel[unsafe.Pointer])(q)
-	return queue.Push(v)
+		return 0
+	})
+	return 1
 }

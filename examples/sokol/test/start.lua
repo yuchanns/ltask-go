@@ -43,8 +43,10 @@ return ltask.loadfile(filename)
     }),
   }
   local bootstrap = boot.dofile(searchpath("bootstrap"))
+  local core = config.core or {}
+  core.external_queue = core.external_queue or 4096
   local ctx = bootstrap.start({
-    core = config.core or {},
+    core = core,
     root = root_config,
     root_initfunc = ([=[
 local ltask = require("ltask")
@@ -63,6 +65,15 @@ return ltask.loadfile(filename)
   })
   print("ltask Start")
   waitfunc = function() bootstrap.wait(ctx) end
+
+  local sender = boot.external_sender(ctx)
+  local function send_message(...) sender(ctx, ...) end
+
+  return {
+    cleanup = function() send_message("cleanup") end,
+    frame = function(count) send_message("frame") end,
+    event = function(...) send_message("event") end,
+  }
 end
 
 function M.wait() return waitfunc() end

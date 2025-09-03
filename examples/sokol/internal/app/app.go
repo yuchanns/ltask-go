@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"unsafe"
 
 	"github.com/phuslu/log"
@@ -33,19 +34,43 @@ func (ctx *Context) OnInit(app *sokol.App) (ret int) {
 	return
 }
 
+func (ctx *Context) invokeCallback(idx int, nargs int) {
+	ctx.L.PushValue(idx)
+	if nargs > 0 {
+		ctx.L.Insert(-nargs - 1)
+	}
+	if err := ctx.L.PCall(nargs, 0, 0); err != nil {
+		log.Error().Msgf("error invoking callback: %v", err)
+	}
+}
+
 func (ctx *Context) OnFrame(app *sokol.App) (ret int) {
-	log.Debug().Msg("frame")
+	ctx.L.PushInteger(int64(app.FrameCount()))
+	ctx.invokeCallback(FrameCallback, 1)
 	return 0
 }
 
 func (ctx *Context) OnCleanup(app *sokol.App) (ret int) {
-	log.Debug().Msg("cleanup")
+	ctx.invokeCallback(CleanupCallback, 0)
 	return 0
 }
 
 func (ctx *Context) OnEvent(app *sokol.App, ev unsafe.Pointer) (ret int) {
-	log.Debug().Msgf("event: %v", ev)
+	ctx.L.PushLightUserData(ev)
+	ctx.invokeCallback(EventCallback, 1)
 	return 0
+}
+
+const (
+	FrameCallback   = 1
+	EventCallback   = 2
+	CleanupCallback = 3
+)
+
+func msgHandler(L *lua.State) int {
+	msg := L.ToString(1)
+	L.Traceback(L, msg, 1)
+	return 1
 }
 
 func pmain(L *lua.State) int {
@@ -59,15 +84,24 @@ func pmain(L *lua.State) int {
 		L.PushString(v)
 	}
 	argN := L.GetTop() - argTableIdx + 1
-	if err := L.LoadFile(args[0]); err != nil {
-		return L.Errorf("cannot load %s: %v", args[0], err)
+	filename := args[0]
+	if err := L.LoadString(fmt.Sprintf(`local func = loadfile("%s"); return func(...)`, filename)); err != nil {
+		return L.Errorf("error load and running %s: %v", filename, err)
 	}
 	L.Insert(-argN - 1)
-	if err := L.PCall(argN, 0, 0); err != nil {
-		return L.Errorf("error running %s: %v", args[0], err)
+	if err := L.PCall(argN, 1, 0); err != nil {
+		return L.Errorf("error running %s: %v", filename, err)
 	}
 
-	return 0
+	return 1
+}
+
+func setFunction(L *lua.State, key string, idx int) (err error) {
+	if L.GetField(-1, key) != lua.LUA_TFUNCTION {
+		return fmt.Errorf("missing function: %s", key)
+	}
+	L.Insert(idx)
+	return
 }
 
 func (ctx *Context) start() (err error) {
@@ -75,12 +109,46 @@ func (ctx *Context) start() (err error) {
 	if err != nil {
 		return
 	}
-	ctx.L = L
-	ctx.L.PushGoFunction(pmain)
-	err = ctx.L.PCall(0, 0, 0)
-	if err == nil {
+	defer func() {
+		if err != nil {
+			L.Close()
+		}
+	}()
+
+	L.PushGoFunction(msgHandler)
+	L.PushGoFunction(pmain)
+	err = L.PCall(0, 1, 1)
+	if err != nil {
 		return
 	}
-	ctx.L.Close()
+
+	ctx.L = L
+
+	err = ctx.initCallback()
+	return
+}
+
+func (ctx *Context) initCallback() (err error) {
+	L := ctx.L
+	if L.Type(-1) != lua.LUA_TTABLE {
+		err = fmt.Errorf("error running pmain: must return a table", err)
+		return
+	}
+
+	type callbackFn struct {
+		name string
+		idx  int
+	}
+	callbackFns := []callbackFn{
+		{name: "frame", idx: FrameCallback},
+		{name: "event", idx: EventCallback},
+		{name: "cleanup", idx: CleanupCallback},
+	}
+	for _, cb := range callbackFns {
+		if err = setFunction(L, cb.name, cb.idx); err != nil {
+			return
+		}
+	}
+	L.SetTop(len(callbackFns))
 	return
 }

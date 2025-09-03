@@ -18,8 +18,9 @@ type AppContext interface {
 }
 
 type ffi struct {
-	SappRun  func(unsafe.Pointer) `ffi:"sapp_run"`
-	SappQuit func()               `ffi:"sapp_quit"`
+	SappRun        func(unsafe.Pointer) `ffi:"sapp_run"`
+	SappQuit       func()               `ffi:"sapp_quit"`
+	SappFrameCount func() uint64        `ffi:"sapp_frame_count"`
 }
 
 type App struct {
@@ -53,6 +54,10 @@ func NewApp(handle uintptr, ctx AppContext) *App {
 
 func (app *App) Quit() {
 	app.ffi.SappQuit()
+}
+
+func (app *App) FrameCount() uint64 {
+	return app.ffi.SappFrameCount()
 }
 
 type sappDesc struct {

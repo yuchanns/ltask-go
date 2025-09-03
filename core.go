@@ -60,6 +60,7 @@ func (task *ltask) init(L *lua.State, config *ltaskConfig) {
 	task.schedule = xxchan.Make[int](ptr, int(config.maxService))
 	task.timer = nil
 	task.externalMessage = nil
+	task.externalLastMessage = nil
 
 	if config.externalQueue > 0 {
 		ptr := malloc.Alloc(uint(xxchan.Sizeof[unsafe.Pointer](int(config.externalQueue))))

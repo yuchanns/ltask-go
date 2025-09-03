@@ -2,7 +2,7 @@ local start = require("test.start")
 
 function cleanup() start.wait() end
 
-start.start({
+return start.start({
   core = {
     -- debuglog = "=", -- stdout
   },
