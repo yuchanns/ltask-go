@@ -14,8 +14,6 @@ end
 
 local M = {}
 
-local waitfunc
-
 function M.start(config)
   local servicepath = searchpath("service")
   local root_config = {
@@ -64,19 +62,19 @@ return ltask.loadfile(filename)
     mainthread = config.mainthread,
   })
   print("ltask Start")
-  waitfunc = function() bootstrap.wait(ctx) end
 
   local sender, sender_ud = boot.external_sender(ctx)
   local sendmessage = require("sapp").sendmessage
   local function send_message(...) sendmessage(sender, sender_ud, ...) end
 
   return {
-    cleanup = function() send_message("cleanup") end,
+    cleanup = function()
+      send_message("cleanup")
+      bootstrap.wait(ctx)
+    end,
     frame = function(count) send_message("frame", count) end,
     event = function(...) send_message("event") end,
   }
 end
-
-function M.wait() return waitfunc() end
 
 return M

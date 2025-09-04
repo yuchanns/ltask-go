@@ -12,7 +12,7 @@ end
 
 local command = {}
 
-command["cleanup"] = function() ltask.quit() end
+command["cleanup"] = function() S.quit() end
 
 function S.external(p)
   local what, arg1, arg2 = unpackmessage(p)
