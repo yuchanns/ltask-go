@@ -1,4 +1,4 @@
-name: ltask Test
+name: Behavior Test
 
 on:
   push:
@@ -27,6 +27,7 @@ jobs:
         with:
           version: "v2.1"
   test:
+    name: Lua ${{ matrix.version }} / ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:

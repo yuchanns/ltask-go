@@ -1,4 +1,4 @@
-name: ltask Example
+name: Example
 
 on:
   push:
@@ -8,14 +8,67 @@ on:
     branches:
       - main
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+
 jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      plan: ${{ steps.plan.outputs.plan }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # fetch depth set to 0 to make sure we have correct diff result.
+          fetch-depth: 0
+
+      - name: Plan
+        id: plan
+        # Source: https://github.com/apache/opendal/blob/main/.github/workflows/test_behavior.yml
+        run: |
+          event_name="${{ github.event_name }}"
+          repository="${{ github.repository }}"
+          files_changed=""
+          has_secrets="false"
+          is_push="false"
+
+          # Handle event-specific logic
+          if [ "$event_name" == "push" ]; then
+            if [ "$repository" == "yuchanns/ltask-go" ]; then
+              is_push="true"
+              has_secrets="true"
+            fi
+          elif [ "$event_name" == "pull_request" ]; then
+            pr_head_repo_fork="${{ github.event.pull_request.head.repo.fork }}"
+            # Only expose secrets for main repo and non-dependabot runs to mitigate security risks
+            if [ "$pr_head_repo_fork" != "true" ] && [ "${{ github.actor }}" != "dependabot[bot]" ]; then
+              has_secrets="true"
+            fi
+
+            files_changed=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }})
+            echo "Files changed:"
+            echo "$files_changed"
+          fi
+
+          # Export variables
+          export GITHUB_HAS_SECRETS=$has_secrets
+          export GITHUB_IS_PUSH=$is_push
+
+          # Run the workflow planner script
+          PLAN=$(python ./.github/scripts/examples/plan.py $files_changed)
+          echo "Plan:"
+          echo "$PLAN" | jq .
+          echo "plan=$PLAN" >> $GITHUB_OUTPUT
   examples:
+    name: ${{ matrix.example }} / ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    needs: [plan]
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        example: [webserver]
+        example: ${{ fromJson(needs.plan.outputs.plan).examples }}
     steps:
       - uses: actions/checkout@v4
         with:
