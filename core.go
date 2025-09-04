@@ -5,6 +5,7 @@ import (
 	"sync/atomic"
 	"unsafe"
 
+	"github.com/ebitengine/purego"
 	"github.com/phuslu/log"
 	"github.com/smasher164/mem"
 	"go.yuchanns.xyz/lua"
@@ -28,6 +29,9 @@ type ltask struct {
 	activeWorker        atomicInt
 	threadCount         atomicInt
 	blockedService      int64
+
+	// purego function pointers to avoid exceed limits
+	pushString uintptr
 }
 
 func (task *ltask) allocSockevent() (index int) {
@@ -52,6 +56,9 @@ func (task *ltask) init(L *lua.State, config *ltaskConfig) {
 	task = (*ltask)(L.NewUserDataUv(int(unsafe.Sizeof(*task)), 0))
 	L.SetField(lua.LUA_REGISTRYINDEX, "LTASK_GLOBAL")
 	task.lib = L.Lib()
+	task.pushString = purego.NewCallback(func(L unsafe.Pointer) int {
+		return pushString(task.lib.BuildState(L))
+	})
 	task.lqueue = newLogQueue()
 	task.config = config
 

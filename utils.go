@@ -1,8 +1,6 @@
 package ltask
 
 import (
-	"unsafe"
-
 	"go.yuchanns.xyz/lua"
 )
 
@@ -14,22 +12,6 @@ func getErrorMessage(L *lua.State) string {
 		return L.ToString(-1)
 	}
 	return "Invalid error message"
-}
-
-func errorMessage(fromL, toL *lua.State, msg string) {
-	if toL == nil {
-		return
-	}
-	if fromL != nil {
-		errMsg := fromL.ToString(-1)
-		toL.PushGoFunction(pushString)
-		toL.PushLightUserData(unsafe.Pointer(&errMsg))
-		if toL.PCall(1, 1, 0) == nil {
-			return
-		}
-		toL.Pop(1)
-	}
-	toL.PushLightUserData(unsafe.Pointer(&msg))
 }
 
 func pushString(L *lua.State) int {
