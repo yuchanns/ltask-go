@@ -29,7 +29,8 @@ runs:
     - name: Run example
       shell: bash
       run: |
-        go run . ./test.lua
+        go run -gcflags=all=-d=checkptr -v . ./test.lua
       working-directory: examples/sokol
       env:
         CGO_ENABLED: 0
+        GODEBUG: "gctrace=1,gccheckmark=1"

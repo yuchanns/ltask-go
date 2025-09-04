@@ -22,7 +22,7 @@ end
 
 ltask.fork(function() ltask.call(1, "external_forward", ltask.self(), "external") end)
 
--- for testing purpose, quit after 10 second
-ltask.timeout(1000, function() sapp.quit() end)
+-- for testing purpose, quit after 5 second
+ltask.timeout(500, function() sapp.quit() end)
 
 return S
