@@ -5,10 +5,7 @@ local unpackmessage = sapp.unpackmessage
 
 local S = {}
 
-function S.quit()
-  print("quit")
-  ltask.quit()
-end
+function S.quit() ltask.quit() end
 
 local command = {}
 

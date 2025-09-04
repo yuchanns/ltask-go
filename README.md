@@ -1,5 +1,8 @@
 # ltask-go
 
+![Behavior ci](https://github.com/yuchanns/ltask-go/actions/workflows/ltask_test.yml/badge.svg?branch=main)
+![Example ci](https://github.com/yuchanns/ltask-go/actions/workflows/ltask_example.yml/badge.svg?branch=main)
+
 A rewrite of [cloudwu/ltask](https://github.com/cloudwu/ltask) in Go.
 
 ## Caution
