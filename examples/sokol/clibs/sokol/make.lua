@@ -7,14 +7,14 @@ lm:source_set("source_sokol")({
   sources = {
     lm.os == "macos" and "./dummy.m" or "./dummy.c",
   },
-  flags = {
-    lm.os ~= "windows" and "-Wno-unknown-pragmas" or "-wd4068",
-    lm.os ~= "windows" and "-fPIC",
-  },
   msvc = {
     flags = {
       "/utf-8",
+      "-wd4068",
     },
+  },
+  gcc = {
+    flags = { "-Wno-unknown-pragmas", "-fPIC" },
   },
   visibility = "default",
   windows = {
