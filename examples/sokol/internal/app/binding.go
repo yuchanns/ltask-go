@@ -37,27 +37,26 @@ func openApp(L *lua.State) int {
 	return 1
 }
 
-type sokolMessage[T interface{ [2]int | uint64 }] struct {
+type sokolMessage struct {
 	Type string
-	v    T
+	v    uint64
 }
 
 func alignUp(n, align int) uint {
 	return uint((n + align - 1) &^ (align - 1))
 }
 
-func newMessage(typ string, p1, p2 int) (msg *sokolMessage[[2]int]) {
+func newMessage(typ string, p1, p2 uint32) (msg *sokolMessage) {
 	ptr := mem.Alloc(alignUp(int(unsafe.Sizeof(*msg)), 8))
-	msg = (*sokolMessage[[2]int])(ptr)
+	msg = (*sokolMessage)(ptr)
 	msg.Type = typ
-	msg.v[0] = p1
-	msg.v[1] = p2
+	msg.v = uint64(p1)<<32 | uint64(p2)
 	return
 }
 
-func newMessage64(typ string, v uint64) (msg *sokolMessage[uint64]) {
+func newMessage64(typ string, v uint64) (msg *sokolMessage) {
 	ptr := mem.Alloc(alignUp(int(unsafe.Sizeof(*msg)), 8))
-	msg = (*sokolMessage[uint64])(ptr)
+	msg = (*sokolMessage)(ptr)
 	msg.Type = typ
 	msg.v = v
 	return
@@ -81,7 +80,7 @@ func lsendMessage(L *lua.State) int {
 		msg = unsafe.Pointer(newMessage64(what, uint64(p1)))
 	} else {
 		p2 := L.CheckInteger(5)
-		msg = unsafe.Pointer(newMessage(what, int(p1), int(p2)))
+		msg = unsafe.Pointer(newMessage(what, uint32(p1), uint32(p2)))
 	}
 	sendMessage(p, msg)
 	return 0
@@ -89,15 +88,11 @@ func lsendMessage(L *lua.State) int {
 
 func lunpackMessage(L *lua.State) int {
 	L.CheckType(1, lua.LUA_TLIGHTUSERDATA)
-	m := (*sokolMessage[[2]int])(L.ToPointer(1))
+	m := (*sokolMessage)(L.ToPointer(1))
 	L.PushString(m.Type)
-	L.PushInteger(int64(m.v[0]))
-	L.PushInteger(int64(m.v[1]))
-	var u64 uint64
-	if unsafe.Sizeof(m.v) >= 8 {
-		u64 = *(*uint64)(unsafe.Pointer(&m.v))
-	}
-	L.PushInteger(int64(u64))
+	L.PushInteger(int64(uint32(m.v)))
+	L.PushInteger(int64(m.v >> 32))
+	L.PushInteger(int64(m.v))
 	mem.Free(unsafe.Pointer(m))
 	return 4
 }
