@@ -5,11 +5,24 @@ local unpackmessage = sapp.unpackmessage
 
 local S = {}
 
+function S.quit()
+  print("quit")
+  ltask.quit()
+end
+
+local command = {}
+
+command["cleanup"] = function() ltask.quit() end
+
 function S.external(p)
   local what, arg1, arg2 = unpackmessage(p)
   print("external", what, arg1, arg2)
+  if command[what] then command[what](arg1, arg2) end
 end
 
 ltask.fork(function() ltask.call(1, "external_forward", ltask.self(), "external") end)
+
+-- for testing purpose, quit after 10 second
+ltask.timeout(1000, function() sapp.quit() end)
 
 return S

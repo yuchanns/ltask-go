@@ -95,13 +95,6 @@ jobs:
                 with:
                   version: "v2.1"
                   working-directory: examples/${{ matrix.example }}
-              - name: Run example
-                shell: bash
-                run: |
-                  go run .
-                working-directory: examples/${{ matrix.example }}
-                env:
-                  CGO_ENABLED: 0
           EOF
       - name: Run
         uses: ./dynamic_test_example

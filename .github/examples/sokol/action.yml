@@ -1,34 +1,35 @@
-name: webserver
-description: 'A simple web server example using ltask'
+name: sokol
+description: 'A simple example integrating sokol_app with ltask'
 
 runs:
   using: 'composite'
   steps:
+    - uses: pyvista/setup-headless-display-action@v3
     - name: Cache C Dependencies
       uses: actions/cache@v4
       id: cache
       with:
         path: |
-          examples/webserver/build/bin
-        key: ltask-${{ runner.os }}-webserver-${{ hashFiles('examples/webserver/make.lua') }}
+          examples/sokol/build/bin
+        key: ltask-${{ runner.os }}-sokol-${{ hashFiles('examples/sokol/make.lua') }}
     - name: Setup dependencies (Linux)
       if: runner.os == 'Linux' && steps.cache.outputs.cache-hit != 'true'
       shell: bash
       run: |
         sudo apt update
-        sudo apt install gcc g++ ninja-build binutils-dev libunwind-dev -y
+        sudo apt install gcc g++ ninja-build libx11-dev libxrandr-dev libxcursor-dev libxi-dev libxinerama-dev libgl1-mesa-dev -y
     - name: Setup MSVC (Windows)
       if: runner.os == 'Windows' && steps.cache.outputs.cache-hit != 'true'
       uses: ilammy/msvc-dev-cmd@v1
     - name: Build C Dependencies
       if: steps.cache.outputs.cache-hit != 'true'
       run: luamake
-      working-directory: examples/webserver
+      working-directory: examples/sokol
       shell: bash
     - name: Run example
       shell: bash
       run: |
-        go run .
-      working-directory: examples/webserver
+        go run . ./test.lua
+      working-directory: examples/sokol
       env:
         CGO_ENABLED: 0

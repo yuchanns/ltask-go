@@ -3,6 +3,7 @@ package app
 import (
 	"unsafe"
 
+	"github.com/ebitengine/purego"
 	"github.com/smasher164/mem"
 	"go.yuchanns.xyz/ltask"
 	"go.yuchanns.xyz/lua"
@@ -32,6 +33,7 @@ func openApp(L *lua.State) int {
 	l := []*lua.Reg{
 		{Name: "sendmessage", Func: lsendMessage},
 		{Name: "unpackmessage", Func: lunpackMessage},
+		{Name: "quit", Func: lquit},
 	}
 	L.NewLib(l)
 	return 1
@@ -95,4 +97,11 @@ func lunpackMessage(L *lua.State) int {
 	L.PushInteger(int64(m.v))
 	mem.Free(unsafe.Pointer(m))
 	return 4
+}
+
+func lquit(L *lua.State) int {
+	var quit func()
+	purego.RegisterLibFunc(&quit, L.Lib().FFI().Lib(), "sapp_request_quit")
+	quit()
+	return 0
 }
