@@ -9,15 +9,16 @@ import (
 )
 
 func externalOpenLibs(L *lua.State) {
-	openLibs := L.FFI().LuaLOpenlibs
-	clone := L.Clone
+	ffi := L.Lib().FFI()
+	openLibs := ffi.LuaLOpenlibs
+	buildState := L.Lib().BuildState
 	l := []*lua.Reg{
 		{Name: "sapp", Func: openApp},
 	}
 
-	L.FFI().LuaLOpenlibs = func(luaL unsafe.Pointer) {
+	ffi.LuaLOpenlibs = func(luaL unsafe.Pointer) {
 		openLibs(luaL)
-		L := clone(luaL)
+		L := buildState(luaL)
 
 		L.GetGlobal("package")
 		_ = L.GetField(-1, "preload")

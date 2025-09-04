@@ -7,6 +7,7 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/ebitengine/purego"
 	"github.com/phuslu/log"
 	"go.yuchanns.xyz/lua"
 	"go.yuchanns.xyz/xxchan"
@@ -51,16 +52,20 @@ type service struct {
 	stat          memoryStat
 	cpucost       uint64
 	clock         uint64
+
+	// purego function pointers to avoid exceed limits
+	initService   uintptr
+	requireModule uintptr
 }
 
 func (s *service) init(ud *serviceUd, queueLen int64, pL *lua.State) (ok bool) {
 	// TODO: compatible 505
 	// malloc
-	L, err := lua.NewWithFFI(pL.FFI()).NewState()
+	L, err := pL.Lib().NewState()
 	if err != nil {
 		return
 	}
-	L.PushGoFunction(initService)
+	L.PushCFunction(s.initService)
 	L.PushLightUserData(ud)
 	L.PushInteger(int64(unsafe.Sizeof(*ud)))
 	if err := L.PCall(2, 0, 0); err != nil {
@@ -82,7 +87,7 @@ func (s *service) requiref(name string, fn lua.GoFunc, pL *lua.State) (ok bool) 
 		return false
 	}
 	L := s.rL
-	L.PushGoFunction(requireModule)
+	L.PushCFunction(s.requireModule)
 	L.PushLightUserData(&name)
 	L.PushLightUserData(&fn)
 	if L.PCall(2, 0, 0) != nil {
@@ -145,9 +150,13 @@ type servicePool struct {
 	queueLen int64
 	id       int32
 	s        []*service
+
+	// purego function pointers to avoid exceed limits
+	initService   uintptr
+	requireModule uintptr
 }
 
-func newServicePool(config *ltaskConfig) (pool *servicePool) {
+func (task *ltask) newServicePool(config *ltaskConfig) (pool *servicePool) {
 	structSize := int(unsafe.Sizeof(servicePool{}))
 	elemSize := int(unsafe.Sizeof(&service{}))
 	elemAlign := int(unsafe.Alignof(&service{}))
@@ -157,6 +166,12 @@ func newServicePool(config *ltaskConfig) (pool *servicePool) {
 	pool.id = 0
 	pool.queueLen = config.queueSending
 	pool.s = unsafe.Slice((**service)(unsafe.Pointer(uintptr(ptr)+uintptr(structSize))), int(config.maxService))
+	pool.initService = purego.NewCallback(func(L unsafe.Pointer) int {
+		return initService(task.lib.BuildState(L))
+	})
+	pool.requireModule = purego.NewCallback(func(L unsafe.Pointer) int {
+		return requireModule(task.lib.BuildState(L))
+	})
 	return
 }
 
@@ -378,6 +393,8 @@ func (p *servicePool) newService(sid serviceId) (svcId serviceId) {
 	s.clock = 0
 	s.sockeventId = -1
 	s.label = [32]byte{}
+	s.initService = p.initService
+	s.requireModule = p.requireModule
 	p.setService(s)
 	return
 }

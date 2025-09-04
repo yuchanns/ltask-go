@@ -13,6 +13,7 @@ import (
 )
 
 type ltask struct {
+	lib                 *lua.Lib
 	config              *ltaskConfig
 	workers             []workerThread
 	eventInit           [maxSockEvent]atomicInt
@@ -50,12 +51,13 @@ func (task *ltask) pushLog(id serviceId, data unsafe.Pointer, sz int64) (ok bool
 func (task *ltask) init(L *lua.State, config *ltaskConfig) {
 	task = (*ltask)(L.NewUserDataUv(int(unsafe.Sizeof(*task)), 0))
 	L.SetField(lua.LUA_REGISTRYINDEX, "LTASK_GLOBAL")
+	task.lib = L.Lib()
 	task.lqueue = newLogQueue()
 	task.config = config
 
 	task.initWorker(L)
 
-	task.services = newServicePool(config)
+	task.services = task.newServicePool(config)
 	ptr := malloc.Alloc(uint(xxchan.Sizeof[int](int(config.maxService))))
 	task.schedule = xxchan.Make[int](ptr, int(config.maxService))
 	task.timer = nil

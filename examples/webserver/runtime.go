@@ -17,7 +17,8 @@ type externalFFI struct {
 }
 
 func externalOpenLibs(L *lua.State) {
-	luaLOpenLibs := L.FFI().LuaLOpenlibs
+	ffi := L.Lib().FFI()
+	luaLOpenLibs := ffi.LuaLOpenlibs
 
 	var effi externalFFI
 	t := reflect.TypeOf(&effi).Elem()
@@ -39,7 +40,7 @@ func externalOpenLibs(L *lua.State) {
 			continue
 		}
 		fptr := v.Field(i).Addr().Interface()
-		purego.RegisterLibFunc(fptr, L.FFI().Lib(), fname)
+		purego.RegisterLibFunc(fptr, ffi.Lib(), fname)
 		fn := *fptr.(*luaopenLib)
 		l = append(l, &lua.Reg{
 			Name: strings.ReplaceAll(strings.TrimPrefix(fname, "luaopen_"), "_", "."),
@@ -47,11 +48,10 @@ func externalOpenLibs(L *lua.State) {
 		})
 	}
 
-	clone := L.Clone
-
-	L.FFI().LuaLOpenlibs = func(luaL unsafe.Pointer) {
+	buildState := L.Lib().BuildState
+	ffi.LuaLOpenlibs = func(luaL unsafe.Pointer) {
 		luaLOpenLibs(luaL)
-		L := clone(luaL)
+		L := buildState(luaL)
 		L.GetGlobal("package")
 		_ = L.GetField(-1, "preload")
 		L.SetFuncs(l, 0)

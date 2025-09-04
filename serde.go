@@ -682,7 +682,7 @@ func (rb *readBlock) pushValue(L *lua.State, typ, cookie uint8) {
 			L.PushLightUserData(rb.getPointer(L))
 		case serdeTypeUserDataCFunc:
 			fn := rb.getPointer(L)
-			L.PushCFunction(fn)
+			L.PushCFunction(uintptr(fn))
 		default:
 			L.Errorf("Invalid userdata")
 		}
