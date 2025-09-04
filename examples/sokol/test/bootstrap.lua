@@ -9,11 +9,15 @@ function S.quit() ltask.quit() end
 
 local command = {}
 
-command["cleanup"] = function() S.quit() end
+command["cleanup"] = function()
+  print("cleanup")
+  S.quit()
+end
+command["frame"] = function(count) print("frame", count) end
+command["event"] = function(name, data) print("event", name, data) end
 
 function S.external(p)
   local what, arg1, arg2 = unpackmessage(p)
-  print("external", what, arg1, arg2)
   if command[what] then command[what](arg1, arg2) end
 end
 
