@@ -42,8 +42,12 @@ type sokolMessage[T interface{ [2]int | uint64 }] struct {
 	v    T
 }
 
+func alignUp(n, align int) uint {
+	return uint((n + align - 1) &^ (align - 1))
+}
+
 func newMessage(typ string, p1, p2 int) (msg *sokolMessage[[2]int]) {
-	ptr := mem.Alloc(uint(unsafe.Sizeof(*msg)))
+	ptr := mem.Alloc(alignUp(int(unsafe.Sizeof(*msg)), 8))
 	msg = (*sokolMessage[[2]int])(ptr)
 	msg.Type = typ
 	msg.v[0] = p1
@@ -52,7 +56,7 @@ func newMessage(typ string, p1, p2 int) (msg *sokolMessage[[2]int]) {
 }
 
 func newMessage64(typ string, v uint64) (msg *sokolMessage[uint64]) {
-	ptr := mem.Alloc(uint(unsafe.Sizeof(*msg)))
+	ptr := mem.Alloc(alignUp(int(unsafe.Sizeof(*msg)), 8))
 	msg = (*sokolMessage[uint64])(ptr)
 	msg.Type = typ
 	msg.v = v
