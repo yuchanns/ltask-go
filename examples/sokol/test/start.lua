@@ -64,9 +64,9 @@ return ltask.loadfile(filename)
   })
   print("ltask Start")
 
-  local sender, sender_ud = boot.external_sender(ctx)
+  local sender_ud = boot.external_sender(ctx)
   local sendmessage = app.sendmessage
-  local function send_message(...) sendmessage(sender, sender_ud, ...) end
+  local function send_message(...) sendmessage(sender_ud, ...) end
   local unpackevent = app.unpackevent
 
   return {

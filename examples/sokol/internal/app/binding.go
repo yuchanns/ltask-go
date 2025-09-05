@@ -68,20 +68,18 @@ func newMessage64(typ *byte, v uint64) (ptr unsafe.Pointer) {
 
 func lsendMessage(L *lua.State) int {
 	L.CheckType(1, lua.LUA_TLIGHTUSERDATA)
-	L.CheckType(2, lua.LUA_TLIGHTUSERDATA)
-	sendMessage := *(*ltask.ExternalSend)(L.ToPointer(1))
-	p := L.ToPointer(2)
-	L.CheckType(3, lua.LUA_TSTRING)
-	what := L.Lib().FFI().LuaTolstring(L.L(), 3, nil)
-	p1 := L.OptInteger(4, 0)
+	p := L.ToPointer(1)
+	L.CheckType(2, lua.LUA_TSTRING)
+	what := L.Lib().FFI().LuaTolstring(L.L(), 2, nil)
+	p1 := L.OptInteger(3, 0)
 	var msg unsafe.Pointer
-	if L.GetTop() < 5 || L.IsNoneOrNil(5) {
+	if L.GetTop() < 5 || L.IsNoneOrNil(4) {
 		msg = newMessage64(what, uint64(p1))
 	} else {
-		p2 := L.CheckInteger(5)
+		p2 := L.CheckInteger(4)
 		msg = newMessage(what, uint32(p1), uint32(p2))
 	}
-	sendMessage(p, msg)
+	ltask.ExternalSend(p, msg)
 	return 0
 }
 
