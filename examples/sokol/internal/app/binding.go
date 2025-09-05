@@ -6,6 +6,7 @@ import (
 	"github.com/ebitengine/purego"
 	"github.com/smasher164/mem"
 	"go.yuchanns.xyz/ltask"
+	"go.yuchanns.xyz/ltask/examples/sokol/internal/sokol"
 	"go.yuchanns.xyz/lua"
 )
 
@@ -33,6 +34,7 @@ func openApp(L *lua.State) int {
 	l := []*lua.Reg{
 		{Name: "sendmessage", Func: lsendMessage},
 		{Name: "unpackmessage", Func: lunpackMessage},
+		{Name: "unpackevent", Func: lunpackEvent},
 		{Name: "quit", Func: lquit},
 	}
 	L.NewLib(l)
@@ -69,15 +71,8 @@ func lsendMessage(L *lua.State) int {
 	L.CheckType(2, lua.LUA_TLIGHTUSERDATA)
 	sendMessage := *(*ltask.ExternalSend)(L.ToPointer(1))
 	p := L.ToPointer(2)
-	var what *byte
-	if L.Type(3) == lua.LUA_TSTRING {
-		// use raw pointer to avoid copy
-		what = L.Lib().FFI().LuaTolstring(L.L(), 3, nil)
-	} else {
-		L.CheckType(3, lua.LUA_TLIGHTUSERDATA)
-		// TODO: what = L.ToPointer(3)
-		return 0
-	}
+	L.CheckType(3, lua.LUA_TSTRING)
+	what := L.Lib().FFI().LuaTolstring(L.L(), 3, nil)
 	p1 := L.OptInteger(4, 0)
 	var msg unsafe.Pointer
 	if L.GetTop() < 5 || L.IsNoneOrNil(5) {
@@ -100,6 +95,16 @@ func lunpackMessage(L *lua.State) int {
 	m.Type = nil
 	mem.Free(unsafe.Pointer(m))
 	return 4
+}
+
+func lunpackEvent(L *lua.State) int {
+	L.CheckType(1, lua.LUA_TLIGHTUSERDATA)
+	ev := (*sokol.SappEvent)(L.ToPointer(1))
+	em := eventUnpack(ev)
+	L.PushString(em.typ)
+	L.PushInteger(int64(em.p1))
+	L.PushInteger(int64(em.p2))
+	return 3
 }
 
 func lquit(L *lua.State) int {

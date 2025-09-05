@@ -1,4 +1,5 @@
 local boot = require("ltask.bootstrap")
+local app = require("sapp")
 
 local function searchpath(name) return assert(boot.searchpath(name, "lualib/?.lua")) end
 
@@ -64,8 +65,9 @@ return ltask.loadfile(filename)
   print("ltask Start")
 
   local sender, sender_ud = boot.external_sender(ctx)
-  local sendmessage = require("sapp").sendmessage
+  local sendmessage = app.sendmessage
   local function send_message(...) sendmessage(sender, sender_ud, ...) end
+  local unpackevent = app.unpackevent
 
   return {
     cleanup = function()
@@ -73,7 +75,7 @@ return ltask.loadfile(filename)
       bootstrap.wait(ctx)
     end,
     frame = function(count) send_message("frame", count) end,
-    event = function(...) send_message("event") end,
+    event = function(...) send_message(unpackevent(...)) end,
   }
 end
 
