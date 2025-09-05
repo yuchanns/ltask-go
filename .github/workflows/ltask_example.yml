@@ -1,4 +1,4 @@
-name: ltask Example
+name: Example
 
 on:
   push:
@@ -8,56 +8,94 @@ on:
     branches:
       - main
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+
 jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      plan: ${{ steps.plan.outputs.plan }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # fetch depth set to 0 to make sure we have correct diff result.
+          fetch-depth: 0
+
+      - name: Plan
+        id: plan
+        # Source: https://github.com/apache/opendal/blob/main/.github/workflows/test_behavior.yml
+        run: |
+          event_name="${{ github.event_name }}"
+          repository="${{ github.repository }}"
+          files_changed=""
+          has_secrets="false"
+          is_push="false"
+
+          # Handle event-specific logic
+          if [ "$event_name" == "push" ]; then
+            if [ "$repository" == "yuchanns/ltask-go" ]; then
+              is_push="true"
+              has_secrets="true"
+            fi
+          elif [ "$event_name" == "pull_request" ]; then
+            pr_head_repo_fork="${{ github.event.pull_request.head.repo.fork }}"
+            # Only expose secrets for main repo and non-dependabot runs to mitigate security risks
+            if [ "$pr_head_repo_fork" != "true" ] && [ "${{ github.actor }}" != "dependabot[bot]" ]; then
+              has_secrets="true"
+            fi
+
+            files_changed=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }})
+            echo "Files changed:"
+            echo "$files_changed"
+          fi
+
+          # Export variables
+          export GITHUB_HAS_SECRETS=$has_secrets
+          export GITHUB_IS_PUSH=$is_push
+
+          # Run the workflow planner script
+          PLAN=$(python ./.github/scripts/examples/plan.py $files_changed)
+          echo "Plan:"
+          echo "$PLAN" | jq .
+          echo "plan=$PLAN" >> $GITHUB_OUTPUT
   examples:
+    name: ${{ matrix.example }} / ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    needs: [plan]
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        example: [webserver]
+        example: ${{ fromJson(needs.plan.outputs.plan).examples }}
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-      - name: Cache C Dependencies
-        uses: actions/cache@v4
-        id: cache
-        with:
-          path: |
-            examples/${{ matrix.example }}/build/bin
-          key: ltask-${{ matrix.os }}-${{ matrix.example }}-${{ hashFiles(format('examples/{0}/make.lua', matrix.example)) }}
-      - uses: yuchanns/actions-luamake@v1.0.0
-        if: steps.cache.outputs.cache-hit != 'true'
-        with:
-          luamake-version: 'master'
-      - name: Setup dependencies (Linux)
-        if: runner.os == 'Linux' && steps.cache.outputs.cache-hit != 'true'
-        shell: bash
-        run: |
-          sudo apt update
-          sudo apt install gcc g++ ninja-build binutils-dev libunwind-dev -y
-      - name: Setup MSVC (Windows)
-        if: runner.os == 'Windows' && steps.cache.outputs.cache-hit != 'true'
-        uses: ilammy/msvc-dev-cmd@v1
-      - name: Build C Dependencies
-        if: steps.cache.outputs.cache-hit != 'true'
-        run: luamake
-        working-directory: examples/${{ matrix.example }}
-        shell: bash
       - uses: actions/setup-go@v5
         with:
           go-version: stable
-      - name: Lint (Linux)
-        uses: golangci/golangci-lint-action@v8
-        if: matrix.os == 'ubuntu-latest'
+      - uses: yuchanns/actions-luamake@v1.0.0
         with:
-          version: "v2.1"
-          working-directory: examples/${{ matrix.example }}
-      - name: Run example
+          luamake-version: 'master'
+      - name: Setup
+        shell: bash
         run: |
-          go run .
-        working-directory: examples/${{ matrix.example }}
-        env:
-          CGO_ENABLE: 0 # Disable CGO to ensure pure Go tests
+          mkdir -p ./dynamic_test_example &&
+          cat << 'EOF' > ./dynamic_test_example/action.yml
+          runs:
+            using: "composite"
+            steps:
+              - name: Setup example
+                uses: ./.github/examples/${{ matrix.example }}
+              - name: Lint (Linux)
+                uses: golangci/golangci-lint-action@v8
+                if: runner.os == 'ubuntu-latest'
+                with:
+                  version: "v2.1"
+                  working-directory: examples/${{ matrix.example }}
+          EOF
+      - name: Run
+        uses: ./dynamic_test_example
 

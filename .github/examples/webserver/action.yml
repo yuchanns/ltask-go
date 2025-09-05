@@ -1,0 +1,32 @@
+name: webserver
+description: 'A simple web server example using ltask'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Cache C Dependencies
+      uses: actions/cache@v4
+      id: cache
+      with:
+        path: |
+          examples/webserver/build/bin
+        key: ltask-${{ runner.os }}-webserver-${{ hashFiles('examples/webserver/make.lua') }}
+    - name: Setup dependencies (Linux)
+      if: runner.os == 'Linux' && steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        sudo apt update
+        sudo apt install gcc g++ ninja-build binutils-dev libunwind-dev -y
+    - name: Setup MSVC (Windows)
+      if: runner.os == 'Windows' && steps.cache.outputs.cache-hit != 'true'
+      uses: ilammy/msvc-dev-cmd@v1
+    - name: Build C Dependencies
+      if: steps.cache.outputs.cache-hit != 'true'
+      run: luamake
+      working-directory: examples/webserver
+      shell: bash
+    - name: Run example
+      shell: bash
+      run: |
+        go run -gcflags=all=-d=checkptr -v -race .
+      working-directory: examples/webserver

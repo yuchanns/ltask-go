@@ -1,4 +1,4 @@
-name: ltask Test
+name: Behavior Test
 
 on:
   push:
@@ -27,6 +27,7 @@ jobs:
         with:
           version: "v2.1"
   test:
+    name: Lua ${{ matrix.version }} / ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -75,4 +76,4 @@ jobs:
           go test -gcflags=all=-d=checkptr -v -race
         working-directory: ltask-go
         env:
-          CGO_ENABLE: 0 # Disable CGO to ensure pure Go tests
+          GODEBUG: "gctrace=1,gccheckmark=1"

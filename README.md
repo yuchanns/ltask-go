@@ -1,6 +1,9 @@
 # ltask-go
 
-A showcase of how to build a lua library with [go.yuchanns.xyz/lua](https://github.com/yuchanns/lua) the lua go-binding.
+![Behavior ci](https://github.com/yuchanns/ltask-go/actions/workflows/ltask_test.yml/badge.svg?branch=main)
+![Example ci](https://github.com/yuchanns/ltask-go/actions/workflows/ltask_example.yml/badge.svg?branch=main)
+
+A rewrite of [cloudwu/ltask](https://github.com/cloudwu/ltask) in Go.
 
 ## Caution
 
@@ -55,7 +58,7 @@ func main() {
 	L.OpenLibs()
 
 	// Open the ltask library
-	ltask.OpenLibs(L, lib)
+	ltask.OpenLibs(L)
 
 	// Now you can use ltask in Lua
 	L.DoFile(`./main.lua`)
@@ -95,6 +98,10 @@ end
 
 boot()
 ```
+
+### Examples
+
+More examples can be found in the [`examples`](./examples) directory. e.g. integration with [sokol-app](./examples/sokol).
 
 ### Devlopment
 

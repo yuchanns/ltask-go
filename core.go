@@ -5,6 +5,7 @@ import (
 	"sync/atomic"
 	"unsafe"
 
+	"github.com/ebitengine/purego"
 	"github.com/phuslu/log"
 	"github.com/smasher164/mem"
 	"go.yuchanns.xyz/lua"
@@ -13,7 +14,7 @@ import (
 )
 
 type ltask struct {
-	luaLib              *lua.Lib
+	lib                 *lua.Lib
 	config              *ltaskConfig
 	workers             []workerThread
 	eventInit           [maxSockEvent]atomicInt
@@ -28,6 +29,9 @@ type ltask struct {
 	activeWorker        atomicInt
 	threadCount         atomicInt
 	blockedService      int64
+
+	// purego function pointers to avoid exceed limits
+	pushString uintptr
 }
 
 func (task *ltask) allocSockevent() (index int) {
@@ -48,20 +52,24 @@ func (task *ltask) pushLog(id serviceId, data unsafe.Pointer, sz int64) (ok bool
 	})
 }
 
-func (task *ltask) init(L *lua.State, config *ltaskConfig, luaLib *lua.Lib) {
+func (task *ltask) init(L *lua.State, config *ltaskConfig) {
 	task = (*ltask)(L.NewUserDataUv(int(unsafe.Sizeof(*task)), 0))
 	L.SetField(lua.LUA_REGISTRYINDEX, "LTASK_GLOBAL")
+	task.lib = L.Lib()
+	task.pushString = purego.NewCallback(func(L unsafe.Pointer) int {
+		return pushString(task.lib.BuildState(L))
+	})
 	task.lqueue = newLogQueue()
 	task.config = config
 
 	task.initWorker(L)
 
-	task.services = newServicePool(config)
+	task.services = task.newServicePool(config)
 	ptr := malloc.Alloc(uint(xxchan.Sizeof[int](int(config.maxService))))
 	task.schedule = xxchan.Make[int](ptr, int(config.maxService))
 	task.timer = nil
 	task.externalMessage = nil
-	task.luaLib = luaLib
+	task.externalLastMessage = nil
 
 	if config.externalQueue > 0 {
 		ptr := malloc.Alloc(uint(xxchan.Sizeof[unsafe.Pointer](int(config.externalQueue))))
@@ -439,7 +447,7 @@ func (task *ltask) initService(L *lua.State, id serviceId, label string,
 			task.services.deleteService(id)
 		}
 	}()
-	if !s.init(task.luaLib, ud, task.services.queueLen, L) || !s.requiref("ltask", OpenCore, L) {
+	if !s.init(ud, task.services.queueLen, L) || !s.requiref("ltask", OpenCore, L) {
 		L.PushString(fmt.Sprintf("New service fail: %s", getErrorMessage(L)))
 		return
 	}
