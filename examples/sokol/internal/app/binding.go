@@ -73,7 +73,7 @@ func lsendMessage(L *lua.State) int {
 	what := L.Lib().FFI().LuaTolstring(L.L(), 2, nil)
 	p1 := L.OptInteger(3, 0)
 	var msg unsafe.Pointer
-	if L.GetTop() < 5 || L.IsNoneOrNil(4) {
+	if L.GetTop() < 4 || L.IsNoneOrNil(4) {
 		msg = newMessage64(what, uint64(p1))
 	} else {
 		p2 := L.CheckInteger(4)
