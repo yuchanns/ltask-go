@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -29,6 +30,9 @@ def get_examples() -> list[str]:
     return sorted(examples)
 
 def calculate_final_examples(changed_files: list[str], all_examples: list[str]) -> list[str]:
+    if os.getenv("GITHUB_IS_PUSH") == "true":
+        # On push events, run all examples
+        return all_examples
     # Ignore markdown files
     changed_files = [f for f in changed_files if not f.endswith(".md")]
     
