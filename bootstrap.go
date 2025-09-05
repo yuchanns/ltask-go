@@ -335,15 +335,12 @@ func ltaskExternalSender(L *lua.State) int {
 	if task.externalMessage == nil {
 		return L.Errorf("No external message queue")
 	}
-	L.PushLightUserData(&externalSend)
 	L.PushLightUserData(task.externalMessage)
-	return 2
+	return 1
 }
 
-// ExternalSend is the function type for sending external messages from external threads to the ltask system.
-type ExternalSend func(p unsafe.Pointer, v unsafe.Pointer)
-
-var externalSend ExternalSend = func(p unsafe.Pointer, v unsafe.Pointer) {
-	externalMessage := (*xxchan.Channel[unsafe.Pointer])(p)
-	externalMessage.Push(v)
+// ExternalSend is used to send external messages that can be forwarded to a specified lua service.
+func ExternalSend(p unsafe.Pointer, v unsafe.Pointer) {
+	externalMessge := (*xxchan.Channel[unsafe.Pointer])(p)
+	externalMessge.Push(v)
 }

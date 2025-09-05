@@ -1,133 +1,144 @@
 # ltask-go
 
-![Behavior ci](https://github.com/yuchanns/ltask-go/actions/workflows/ltask_test.yml/badge.svg?branch=main)
-![Example ci](https://github.com/yuchanns/ltask-go/actions/workflows/ltask_example.yml/badge.svg?branch=main)
+[![Behavior CI](https://github.com/yuchanns/ltask-go/actions/workflows/ltask_test.yml/badge.svg?branch=main)](https://github.com/yuchanns/ltask-go/actions)
+[![Example CI](https://github.com/yuchanns/ltask-go/actions/workflows/ltask_example.yml/badge.svg?branch=main)](https://github.com/yuchanns/ltask-go/actions)
+[![Go Reference](https://pkg.go.dev/badge/go.yuchanns.xyz/ltask.svg)](https://pkg.go.dev/go.yuchanns.xyz/ltask)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
-A rewrite of [cloudwu/ltask](https://github.com/cloudwu/ltask) in Go.
+A Go implementation of [cloudwu/ltask](https://github.com/cloudwu/ltask) - a Lua task library with n:m scheduler that enables running M Lua VMs on N OS threads.
 
-## Caution
+## ⚠️ Caution
 
-⚠️This library is **working in progress** 🚧 And APIs are not stable yet, maybe cause breaking changes many times. I make it public only for unlimited GitHub Actions minutes. It is not recommended to use at this moment.
+This library is currently **working in progress** 🚧. APIs are not stable and may undergo breaking changes. It is not recommended for production use at this time.
 
-## Instructions
+## Features
 
-### Usage
+- **N:M Scheduler**: Run multiple Lua VMs efficiently across OS threads
+- **Bootstrap Architecture**: Proper service initialization through bootstrap process
+- **Embedded Lua Runtime**: Built-in Lua support with embedded glue code
+- **Service Management**: Lightweight service model for concurrent tasks
+- **Cross-Platform**: Works on Windows, Linux, and macOS
+
+## Quick Start
+
+### Installation
 
 ```bash
 go get go.yuchanns.xyz/ltask
 ```
 
----
-**ltask embedded Lua code**
+### Basic Usage Pattern
 
-ltask is composed of Go code and a set of Lua glue codes from `lualib` and `service`. The Lua glue code is embedded in the Go binary during compilation.
-
-When using ltask, you can load the embedded Lua modules via `ltask.bootstrap` and `ltask`. For example, if you want to load the `bootstrap.lua` from `lualib`:
+ltask-go follows the bootstrap pattern used in the test files. Create a main Lua file that requires the bootstrap module and starts the system:
 
 ```lua
-local boot = require("ltask.bootstrap")
+-- main.lua
+local start = require("test.start")
 
-local function searchpath(name)
-  return assert(boot.searchpath(name, "lualib/?.lua"))
-end
-local bootstrap = boot.dofile(searchpath("bootstrap"))
--- now you can use the bootstrap to start ltask.
-local ctx = bootstrap.start({})
-bootstrap.wait(ctx)
+start({
+    core = {
+        worker = 3,  -- Number of worker threads
+        -- debuglog = "=",  -- Uncomment for debug output
+    },
+    service_path = "service/?.lua",  -- Service search path
+    bootstrap = {
+        {
+            name = "timer",
+            unique = true,
+            builtin = true,
+        },
+        {
+            name = "logger", 
+            unique = true,
+            builtin = true,
+        },
+        {
+            name = "my_service",  -- Your custom service
+            unique = false,
+        }
+    }
+})
 ```
 
-For more information of usage about embedded Lua, check [`test/start.lua`](./test/start.lua).
+### Creating a Service
 
----
-**Go usage**
-
-```go
-func main() {
-	lib, err := lua.New("/path/to/lua54.so")
-	if err != nil {
-		panic(err)
-	}
-	defer lib.Close()
-
-	L, err := lib.NewState()
-	if err != nil {
-		panic(err)
-	}
-	defer L.Close()
-
-	L.OpenLibs()
-
-	// Open the ltask library
-	ltask.OpenLibs(L)
-
-	// Now you can use ltask in Lua
-	L.DoFile(`./main.lua`)
-
-	// ...
-}
-```
-
-**Lua usage**
+Create a service file. The service path is configurable in the bootstrap setup:
 
 ```lua
--- user
+-- service/my_service.lua
 local ltask = require "ltask"
 
-local S = {}
+local my_service = {}
 
-print "User Start"
-
-function S.ping(...)
-	ltask.timeout(10, function() print(1) end)
-	ltask.timeout(20, function() print(2) end)
-	ltask.timeout(30, function() print(3) end)
-	ltask.sleep(40) -- sleep 0.4 sec
-	-- response
-	return "PING", ...
+function my_service.echo(message)
+    print("Service received:", message)
+    return "Echo: " .. message
 end
 
-return S
-
--- root
-local function boot()
-	print "Root Start"
-	print(os.date("%c", (ltask.now())))
-	local addr = S.spawn("user", "Hello")	-- spawn a new service `user`
-	print(ltask.call(addr, "ping", "PONG"))	-- request "ping" message
+function my_service.ping()
+    return "pong"
 end
 
-boot()
+return my_service
 ```
 
-### Examples
+The service will be automatically loaded when referenced in the bootstrap configuration.
 
-More examples can be found in the [`examples`](./examples) directory. e.g. integration with [sokol-app](./examples/sokol).
+## Core Concepts
 
-### Devlopment
+### Bootstrap Process
 
-We use Go Workspace to manage in early development stage, so you can use the following commands to run the tests.
+ltask-go requires a proper bootstrap sequence:
 
-1. **Clone the repository**
+1. **Require bootstrap**: `local boot = require("ltask.bootstrap")`
+2. **Search embedded files**: Use `boot.searchpath()` to find embedded Lua modules
+3. **Load bootstrap**: `boot.dofile()` to load the main bootstrap module
+4. **Start system**: `bootstrap.start()` with configuration
+5. **Wait for completion**: `bootstrap.wait()` to keep the system running
+
+### Service Configuration
+
+Services are configured through the bootstrap process. The loading behavior is completely customizable via `initfunc`:
+
+- **unique**: Whether only one instance is allowed  
+- **service_path**: Where to search for service files
+- **initfunc**: Custom function to control how services are loaded (completely flexible)
+
+Different examples show different `initfunc` implementations:
+- **Root test**: Uses `ltask.searchpath` and `ltask.loadfile` for embedded services
+- **Sokol example**: Uses standard `package.searchpath` and `loadfile` for external services
+
+## Examples
+
+Explore the provided examples for proper usage patterns:
+
+- **[`test.lua`](./test.lua)** - Main test entry point
+- **[`test/start.lua`](./test/start.lua)** - Bootstrap implementation
+- **[`test/user.lua`](./test/user.lua)** - Example service implementation
+- **[`examples/`](./examples/)** - Application examples, such as [sokol](https://github.com/floooh/sokol)-integration
+
+## Running the Tests
+
 ```bash
-mkdir ltask_workspace
-
-cd ltask_workspace
-
-git clone https://github.com/yuchanns/ltask-go
-
+# Clone the repository and submodules
+git clone --recurse-submodules https://github.com/yuchanns/ltask-go
 git clone --recurse-submodules https://github.com/yuchanns/lua
-```
 
-2. **Prepare the dynamic artifacts**
-```bash
+go work init
+go work use ./ltask-go
+go work use ./lua
+
+# Build Lua library
 cd lua && luamake && cd -
-```
 
-3. **Run the tests**
-```bash
+# Run tests
 cd ltask-go && go test -v ./...
 ```
 
 ## Credits
 
-- [ltask](https://github.com/cloudwu/ltask) is a lua task library that implements an n:m scheduler, so that you can run M lua VMs on N OS threads.
+This project is a Go rewrite of [cloudwu/ltask](https://github.com/cloudwu/ltask), originally created by [云风](https://github.com/cloudwu).
+
+## License
+
+Apache License 2.0 - see [LICENSE](LICENSE) for details.
