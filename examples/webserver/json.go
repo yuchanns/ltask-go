@@ -9,8 +9,8 @@ import (
 
 func luaOpenJSON(L *lua.State) int {
 	l := []*lua.Reg{
-		{"encode", luaJsonEncode},
-		{"decode", luaJsonDecode},
+		{"encode", lua.NewCallback(luaJsonEncode, L.Lib())},
+		{"decode", lua.NewCallback(luaJsonDecode, L.Lib())},
 	}
 	L.NewLib(l)
 	return 1

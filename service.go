@@ -7,7 +7,6 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/ebitengine/purego"
 	"github.com/phuslu/log"
 	"go.yuchanns.xyz/lua"
 	"go.yuchanns.xyz/xxchan"
@@ -185,12 +184,8 @@ func (task *ltask) newServicePool(config *ltaskConfig) (pool *servicePool) {
 	pool.queueLen = config.queueSending
 	pool.s = unsafe.Slice((**service)(unsafe.Pointer(uintptr(ptr)+uintptr(structSize))), int(config.maxService))
 	pool.pushString = task.pushString
-	pool.initService = purego.NewCallback(func(L unsafe.Pointer) int {
-		return initService(task.lib.BuildState(L))
-	})
-	pool.requireModule = purego.NewCallback(func(L unsafe.Pointer) int {
-		return requireModule(task.lib.BuildState(L))
-	})
+	pool.initService = initService
+	pool.requireModule = requireModule
 	return
 }
 
@@ -467,7 +462,7 @@ func RegisterExternalOpenLibs(f func(L *lua.State)) {
 	ltaskExternalOpenLibs = f
 }
 
-func initService(L *lua.State) int {
+var initService = lua.NewCallback(func(L *lua.State) int {
 	// TODO: set ud as a string
 	ud := L.ToUserData(1)
 	L.PushLightUserData(ud)
@@ -478,7 +473,7 @@ func initService(L *lua.State) int {
 		L.OpenLibs()
 	}
 	return 0
-}
+}, lib)
 
 func (p *servicePool) closeServiceMessages(L *lua.State, id serviceId) (reportError int) {
 	var index int

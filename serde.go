@@ -9,6 +9,8 @@ import (
 	"go.yuchanns.xyz/lua"
 )
 
+// TODO: this module should be speparated to a standalone library once it is stable enough.
+
 const (
 	blockSize    = 128
 	maxDepth     = 31
@@ -778,6 +780,8 @@ func mallocFromBuffer(buf []byte) (ptr unsafe.Pointer, alignedSz int) {
 	return
 }
 
+var luaSerdePack = lua.NewCallback(LuaSerdePack, lib)
+
 func LuaSerdePack(L *lua.State) int {
 	buf := serdePack(L, 0)
 	ptr, alignedSz := mallocFromBuffer(buf)
@@ -786,6 +790,8 @@ func LuaSerdePack(L *lua.State) int {
 	L.PushInteger(int64(alignedSz))
 	return 2
 }
+
+var luaSerdeUnpack = lua.NewCallback(LuaSerdeUnpack, lib)
 
 func LuaSerdeUnpack(L *lua.State) int {
 	if L.IsNoneOrNil(1) {
@@ -801,6 +807,8 @@ func LuaSerdeUnpack(L *lua.State) int {
 
 	return serdeUnpack(L, data)
 }
+
+var luaSerdeUnpackRemove = lua.NewCallback(LuaSerdeUnpackRemove, lib)
 
 func LuaSerdeUnpackRemove(L *lua.State) int {
 	if L.IsNoneOrNil(1) {
@@ -819,6 +827,8 @@ func LuaSerdeUnpackRemove(L *lua.State) int {
 
 	return serdeUnpack(L, data)
 }
+
+var luaSerdeRemove = lua.NewCallback(LuaSerdeRemove, lib)
 
 func LuaSerdeRemove(L *lua.State) int {
 	if L.IsNoneOrNil(1) {

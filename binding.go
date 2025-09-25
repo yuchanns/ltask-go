@@ -6,27 +6,33 @@ import (
 	"go.yuchanns.xyz/lua"
 )
 
+var lib = new(lua.Lib)
+
 // OpenLibs opens ltask library.
 // This is useful when you don't write Go code and just want to use ltask directly in Lua.
 func OpenLibs(L *lua.State) {
+	*lib = *L.Lib()
+
 	L.GetGlobal("package")
 	_ = L.GetField(-1, "preload")
 
 	l := []*lua.Reg{
-		{Name: "ltask.bootstrap", Func: OpenBootstrap},
+		{Name: "ltask.bootstrap", Func: lua.NewCallback(OpenBootstrap, L.Lib())},
 	}
 	L.SetFuncs(l, 0)
 	L.Pop(2)
 }
 
 // OpenCore represents `require("ltask")` in Lua.
-// This is useful when you want to integrate ltask to your own lua-binding projects.
+// This is useful when you want to bring ltask to your own lua-binding projects.
 func OpenCore(L *lua.State) int {
+	// ltask is expected to be required many times in many instances of lua.State,
+	// so we should make sure all of its functions are global singletons.
 	l := []*lua.Reg{
-		{Name: "pack", Func: LuaSerdePack},
-		{Name: "unpack", Func: LuaSerdeUnpack},
-		{Name: "remove", Func: LuaSerdeRemove},
-		{Name: "unpack_remove", Func: LuaSerdeUnpackRemove},
+		{Name: "pack", Func: luaSerdePack},
+		{Name: "unpack", Func: luaSerdeUnpack},
+		{Name: "remove", Func: luaSerdeRemove},
+		{Name: "unpack_remove", Func: luaSerdeUnpackRemove},
 		{Name: "timer_sleep", Func: ltaskSleep},
 		{Name: "loadfile", Func: ltaskLoadFile},
 		{Name: "searchpath", Func: ltaskSearchPath},
@@ -67,37 +73,40 @@ func OpenCore(L *lua.State) int {
 var bootInit atomic.Int32
 
 // OpenBootstrap represents `require("ltask.bootstrap")` in Lua.
-// This is useful when you want to integrate ltask to your own lua-binding projects.
+// It can only be required once across the whole program.
+// This is useful when you want to bring ltask to your own lua-binding projects.
 func OpenBootstrap(L *lua.State) int {
 	if bootInit.Add(1) != 1 {
 		return L.Errorf("ltask.bootstrap can only require once")
 	}
+	// ltask.bootstrap is expected to be required only once across the whole program,
+	// so we don't need to make its functions global singletons.
 	l := []*lua.Reg{
 		{Name: "searchpath", Func: ltaskSearchPath},
 		{Name: "readfile", Func: ltaskReadFile},
 		{Name: "loadfile", Func: ltaskLoadFile},
 		{Name: "dofile", Func: ltaskDoFile},
-		{Name: "deinit", Func: ltaskDeinit},
-		{Name: "run", Func: ltaskRun},
-		{Name: "wait", Func: ltaskWait},
-		{Name: "post_message", Func: lpostMessage},
-		{Name: "new_service", Func: ltaskNewService},
-		{Name: "init_timer", Func: ltaskInitTimer},
-		{Name: "init_root", Func: ltaskInitRoot},
-		{Name: "pushlog", Func: ltaskBootPushLog},
+		{Name: "deinit", Func: lua.NewCallback(ltaskDeinit, L.Lib())},
+		{Name: "run", Func: lua.NewCallback(ltaskRun, L.Lib())},
+		{Name: "wait", Func: lua.NewCallback(ltaskWait, L.Lib())},
+		{Name: "post_message", Func: lua.NewCallback(lpostMessage, L.Lib())},
+		{Name: "new_service", Func: lua.NewCallback(ltaskNewService, L.Lib())},
+		{Name: "init_timer", Func: lua.NewCallback(ltaskInitTimer, L.Lib())},
+		{Name: "init_root", Func: lua.NewCallback(ltaskInitRoot, L.Lib())},
+		{Name: "pushlog", Func: lua.NewCallback(ltaskBootPushLog, L.Lib())},
 		// We don't need `init_socket` here, as it is proceed by Go runtime automatically.
-		{Name: "pack", Func: LuaSerdePack},
-		{Name: "unpack", Func: LuaSerdeUnpack},
-		{Name: "remove", Func: LuaSerdeRemove},
-		{Name: "unpack_remove", Func: LuaSerdeUnpackRemove},
-		{Name: "external_sender", Func: ltaskExternalSender},
+		{Name: "pack", Func: luaSerdePack},
+		{Name: "unpack", Func: luaSerdeUnpack},
+		{Name: "remove", Func: luaSerdeRemove},
+		{Name: "unpack_remove", Func: luaSerdeUnpackRemove},
+		{Name: "external_sender", Func: lua.NewCallback(ltaskExternalSender, L.Lib())},
 	}
 
 	L.NewLib(l)
 
 	L.PushLightUserData(L.ToUserData(L.UpValueIndex(1)))
 	l2 := []*lua.Reg{
-		{Name: "init", Func: ltaskInit},
+		{Name: "init", Func: lua.NewCallback(ltaskInit, L.Lib())},
 	}
 	L.SetFuncs(l2, 1)
 	return 1
@@ -106,14 +115,17 @@ func OpenBootstrap(L *lua.State) int {
 var rootInit atomic.Int32
 
 // OpenRoot represents `require("ltask.root")` in Lua.
-// This is useful when you want to integrate ltask to your own lua-binding projects.
+// It can only be required once across the whole program.
+// This is useful when you want to bring ltask to your own lua-binding projects.
 func OpenRoot(L *lua.State) int {
 	if rootInit.Add(1) != 1 {
 		return L.Errorf("ltask.root can only require once")
 	}
+	// ltask.root is expected to be required only once across the whole program,
+	// so we don't need to make its functions global singletons.
 	l := []*lua.Reg{
-		{Name: "init_service", Func: ltaskInitService},
-		{Name: "close_service", Func: ltaskCloseService},
+		{Name: "init_service", Func: lua.NewCallback(ltaskInitService, L.Lib())},
+		{Name: "close_service", Func: lua.NewCallback(ltaskCloseService, L.Lib())},
 	}
 
 	L.NewLibTable(l)

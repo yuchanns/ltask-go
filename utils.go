@@ -14,16 +14,16 @@ func getErrorMessage(L *lua.State) string {
 	return "Invalid error message"
 }
 
-func pushString(L *lua.State) int {
+var pushString = lua.NewCallback(func(L *lua.State) int {
 	msg := *(*string)(L.ToUserData(-1))
 	L.SetTop(1)
 	L.PushString(msg)
 	return 1
-}
+}, lib)
 
-func requireModule(L *lua.State) int {
+var requireModule = lua.NewCallback(func(L *lua.State) int {
 	name := *(*string)(L.ToUserData(1))
 	fn := *(*lua.GoFunc)(L.ToUserData(2))
 	L.Requiref(name, fn, false)
 	return 0
-}
+}, lib)
