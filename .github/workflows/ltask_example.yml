@@ -76,9 +76,9 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: stable
-      - uses: yuchanns/actions-luamake@v1.0.0
+      - uses: yuchanns/actions-luamake@v1
         with:
-          luamake-version: 'master'
+          luamake-version: '5bedfce66f075a9f68b1475747738b81b3b41c25'
       - name: Setup
         shell: bash
         run: |
