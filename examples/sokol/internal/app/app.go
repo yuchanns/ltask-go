@@ -108,8 +108,8 @@ func (ctx *Context) start() (err error) {
 		}
 	}()
 
-	L.PushGoFunction(msgHandler)
-	L.PushGoFunction(pmain)
+	L.PushCFunction(lua.NewCallback(msgHandler, ctx.Lib))
+	L.PushCFunction(lua.NewCallback(pmain, ctx.Lib))
 	err = L.PCall(0, 1, 1)
 	if err != nil {
 		return

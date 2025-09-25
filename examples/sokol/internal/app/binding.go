@@ -10,7 +10,10 @@ import (
 	"go.yuchanns.xyz/lua"
 )
 
+var lib = new(lua.Lib)
+
 func externalOpenLibs(L *lua.State) {
+	*lib = *L.Lib()
 	ffi := L.Lib().FFI()
 	openLibs := ffi.LuaLOpenlibs
 	buildState := L.Lib().BuildState
@@ -30,7 +33,7 @@ func externalOpenLibs(L *lua.State) {
 	}
 }
 
-func openApp(L *lua.State) int {
+var openApp = lua.NewCallback(func(L *lua.State) int {
 	l := []*lua.Reg{
 		{Name: "sendmessage", Func: lsendMessage},
 		{Name: "unpackmessage", Func: lunpackMessage},
@@ -39,7 +42,7 @@ func openApp(L *lua.State) int {
 	}
 	L.NewLib(l)
 	return 1
-}
+}, lib)
 
 type sokolMessage struct {
 	Type *byte
@@ -66,7 +69,7 @@ func newMessage64(typ *byte, v uint64) (ptr unsafe.Pointer) {
 	return
 }
 
-func lsendMessage(L *lua.State) int {
+var lsendMessage = lua.NewCallback(func(L *lua.State) int {
 	L.CheckType(1, lua.LUA_TLIGHTUSERDATA)
 	p := L.ToPointer(1)
 	L.CheckType(2, lua.LUA_TSTRING)
@@ -81,9 +84,9 @@ func lsendMessage(L *lua.State) int {
 	}
 	ltask.ExternalSend(p, msg)
 	return 0
-}
+}, lib)
 
-func lunpackMessage(L *lua.State) int {
+var lunpackMessage = lua.NewCallback(func(L *lua.State) int {
 	L.CheckType(1, lua.LUA_TLIGHTUSERDATA)
 	m := (*sokolMessage)(L.ToPointer(1))
 	L.PushString(bytePtrToString(m.Type))
@@ -93,9 +96,9 @@ func lunpackMessage(L *lua.State) int {
 	m.Type = nil
 	mem.Free(unsafe.Pointer(m))
 	return 4
-}
+}, lib)
 
-func lunpackEvent(L *lua.State) int {
+var lunpackEvent = lua.NewCallback(func(L *lua.State) int {
 	L.CheckType(1, lua.LUA_TLIGHTUSERDATA)
 	ev := (*sokol.SappEvent)(L.ToPointer(1))
 	em := eventUnpack(ev)
@@ -103,11 +106,11 @@ func lunpackEvent(L *lua.State) int {
 	L.PushInteger(int64(em.p1))
 	L.PushInteger(int64(em.p2))
 	return 3
-}
+}, lib)
 
-func lquit(L *lua.State) int {
+var lquit = lua.NewCallback(func(L *lua.State) int {
 	var quit func()
 	purego.RegisterLibFunc(&quit, L.Lib().FFI().Lib(), "sapp_request_quit")
 	quit()
 	return 0
-}
+}, lib)

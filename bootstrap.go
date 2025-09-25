@@ -147,7 +147,7 @@ func checkField(L *lua.State, index int, key string) int64 {
 	return v
 }
 
-func lmessageReceipt(L *lua.State) int {
+var lmessageReceipt = lua.NewCallback(func(L *lua.State) int {
 	s := getS(L)
 	receipt, m := s.task.services.readReceipt(s.id)
 	if receipt == messageReceiptNone {
@@ -172,9 +172,9 @@ func lmessageReceipt(L *lua.State) int {
 	m.delete()
 
 	return 3
-}
+}, lib)
 
-func lsendMessage(L *lua.State) int {
+var lsendMessage = lua.NewCallback(func(L *lua.State) int {
 	s := getS(L)
 	msg := genSendMessage(L, s.id)
 	if !L.IsYieldable() {
@@ -187,9 +187,9 @@ func lsendMessage(L *lua.State) int {
 	}
 
 	return 0
-}
+}, lib)
 
-func lrecvMessage(L *lua.State) (r int) {
+var lrecvMessage = lua.NewCallback(func(L *lua.State) (r int) {
 	s := getS(L)
 	m := s.task.services.popMessage(s.id)
 	if m == nil {
@@ -206,7 +206,7 @@ func lrecvMessage(L *lua.State) (r int) {
 	}
 	m.delete()
 	return
-}
+}, lib)
 
 func lpostMessage(L *lua.State) int {
 	L.CheckType(1, lua.LUA_TTABLE)

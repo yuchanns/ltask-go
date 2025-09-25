@@ -25,7 +25,7 @@ func externalOpenLibs(L *lua.State) {
 	v := reflect.ValueOf(&effi).Elem()
 
 	var l = []*lua.Reg{
-		{Name: "json", Func: luaOpenJSON},
+		{Name: "json", Func: lua.NewCallback(luaOpenJSON, L.Lib())},
 	}
 	for i := range t.NumField() {
 		field := t.Field(i)
@@ -44,7 +44,7 @@ func externalOpenLibs(L *lua.State) {
 		fn := *fptr.(*luaopenLib)
 		l = append(l, &lua.Reg{
 			Name: strings.ReplaceAll(strings.TrimPrefix(fname, "luaopen_"), "_", "."),
-			Func: func(L *lua.State) int { return fn(L.L()) },
+			Func: lua.NewCallback(func(L *lua.State) int { return fn(L.L()) }, L.Lib()),
 		})
 	}
 
