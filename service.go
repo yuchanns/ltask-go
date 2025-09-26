@@ -94,7 +94,7 @@ func (s *service) init(ud *serviceUd, queueLen int64, pL *lua.State) (ok bool) {
 	return true
 }
 
-func (s *service) requiref(name string, fn lua.GoFunc, pL *lua.State) (ok bool) {
+func (s *service) requiref(name string, fn uintptr, pL *lua.State) (ok bool) {
 	if s.rL == nil {
 		s.errorMessage(nil, pL, "requiref: No service")
 		return false
@@ -102,7 +102,7 @@ func (s *service) requiref(name string, fn lua.GoFunc, pL *lua.State) (ok bool) 
 	L := s.rL
 	L.PushCFunction(s.requireModule)
 	L.PushLightUserData(&name)
-	L.PushLightUserData(&fn)
+	L.PushLightUserData(*(*unsafe.Pointer)(unsafe.Pointer(&fn)))
 	if L.PCall(2, 0, 0) != nil {
 		s.errorMessage(L, pL, "requiref: pcall error")
 		L.Pop(1)

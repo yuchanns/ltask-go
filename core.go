@@ -426,6 +426,8 @@ func (task *ltask) getWorkerId(id serviceId) (workerId int) {
 	return -1
 }
 
+var openCore = lua.NewCallback(OpenCore)
+
 func (task *ltask) initService(L *lua.State, id serviceId, label string,
 	source string, chunkName string, workerId int32) (ok bool) {
 	ptr := mem.Alloc(uint(unsafe.Sizeof(serviceUd{})))
@@ -442,7 +444,7 @@ func (task *ltask) initService(L *lua.State, id serviceId, label string,
 			task.services.deleteService(id)
 		}
 	}()
-	if !s.init(ud, task.services.queueLen, L) || !s.requiref("ltask", OpenCore, L) {
+	if !s.init(ud, task.services.queueLen, L) || !s.requiref("ltask", openCore, L) {
 		L.PushString(fmt.Sprintf("New service fail: %s", getErrorMessage(L)))
 		return
 	}

@@ -132,7 +132,7 @@ func ltaskInitRoot(L *lua.State) int {
 	if s == nil {
 		return L.Errorf("Service %d not found", id)
 	}
-	if !s.requiref("ltask.root", OpenRoot, L) {
+	if !s.requiref("ltask.root", lua.NewCallback(OpenRoot), L) {
 		return L.Errorf("Require ltask.root failed: %s", getErrorMessage(L))
 	}
 	return 0
