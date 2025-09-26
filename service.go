@@ -72,7 +72,9 @@ func (s *service) errorMessage(fromL, toL *lua.State, msg string) {
 func (s *service) init(ud *serviceUd, queueLen int64, pL *lua.State) (ok bool) {
 	// TODO: compatible 505
 	// malloc
-	L := lua.NewState()
+	L := lua.NewState(lua.WithStatePointer(
+		(*lua.State)(malloc.Alloc(uint(unsafe.Sizeof(lua.State{})))),
+	))
 	L.PushCFunction(initService)
 	L.PushLightUserData(ud)
 	L.PushInteger(int64(unsafe.Sizeof(*ud)))
@@ -139,6 +141,8 @@ func (s *service) close() {
 	}
 	if s.L != nil {
 		s.L.Close()
+		malloc.Free(unsafe.Pointer(s.L))
+		s.L = nil
 	}
 	if s.msg != nil {
 		for s.msg.Len() > 0 {
