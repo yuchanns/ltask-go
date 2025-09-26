@@ -27,9 +27,6 @@ type ltask struct {
 	activeWorker        atomicInt
 	threadCount         atomicInt
 	blockedService      int64
-
-	// purego function pointers to avoid exceed limits
-	pushString uintptr
 }
 
 func (task *ltask) allocSockevent() (index int) {
@@ -53,7 +50,6 @@ func (task *ltask) pushLog(id serviceId, data unsafe.Pointer, sz int64) (ok bool
 func (task *ltask) init(L *lua.State, config *ltaskConfig) {
 	task = (*ltask)(L.NewUserDataUv(int(unsafe.Sizeof(*task)), 0))
 	L.SetField(lua.LUA_REGISTRYINDEX, "LTASK_GLOBAL")
-	task.pushString = pushString
 	task.lqueue = newLogQueue()
 	task.config = config
 
@@ -426,6 +422,8 @@ func (task *ltask) getWorkerId(id serviceId) (workerId int) {
 	return -1
 }
 
+var openCore = lua.NewCallback(OpenCore)
+
 func (task *ltask) initService(L *lua.State, id serviceId, label string,
 	source string, chunkName string, workerId int32) (ok bool) {
 	ptr := mem.Alloc(uint(unsafe.Sizeof(serviceUd{})))
@@ -442,7 +440,7 @@ func (task *ltask) initService(L *lua.State, id serviceId, label string,
 			task.services.deleteService(id)
 		}
 	}()
-	if !s.init(ud, task.services.queueLen, L) || !s.requiref("ltask", OpenCore, L) {
+	if !s.init(ud, task.services.queueLen, L) || !s.requiref("ltask", openCore, L) {
 		L.PushString(fmt.Sprintf("New service fail: %s", getErrorMessage(L)))
 		return
 	}
