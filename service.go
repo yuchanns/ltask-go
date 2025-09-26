@@ -77,10 +77,7 @@ func (s *service) errorMessage(fromL, toL *lua.State, msg string) {
 func (s *service) init(ud *serviceUd, queueLen int64, pL *lua.State) (ok bool) {
 	// TODO: compatible 505
 	// malloc
-	L, err := pL.Lib().NewState()
-	if err != nil {
-		return
-	}
+	L := lua.NewState()
 	L.PushCFunction(s.initService)
 	L.PushLightUserData(ud)
 	L.PushInteger(int64(unsafe.Sizeof(*ud)))
@@ -473,7 +470,7 @@ var initService = lua.NewCallback(func(L *lua.State) int {
 		L.OpenLibs()
 	}
 	return 0
-}, lib)
+})
 
 func (p *servicePool) closeServiceMessages(L *lua.State, id serviceId) (reportError int) {
 	var index int

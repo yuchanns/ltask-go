@@ -6,18 +6,14 @@ import (
 	"go.yuchanns.xyz/lua"
 )
 
-var lib = new(lua.Lib)
-
 // OpenLibs opens ltask library.
 // This is useful when you don't write Go code and just want to use ltask directly in Lua.
 func OpenLibs(L *lua.State) {
-	*lib = *L.Lib()
-
 	L.GetGlobal("package")
 	_ = L.GetField(-1, "preload")
 
 	l := []*lua.Reg{
-		{Name: "ltask.bootstrap", Func: lua.NewCallback(OpenBootstrap, L.Lib())},
+		{Name: "ltask.bootstrap", Func: lua.NewCallback(OpenBootstrap)},
 	}
 	L.SetFuncs(l, 0)
 	L.Pop(2)
@@ -86,27 +82,27 @@ func OpenBootstrap(L *lua.State) int {
 		{Name: "readfile", Func: ltaskReadFile},
 		{Name: "loadfile", Func: ltaskLoadFile},
 		{Name: "dofile", Func: ltaskDoFile},
-		{Name: "deinit", Func: lua.NewCallback(ltaskDeinit, L.Lib())},
-		{Name: "run", Func: lua.NewCallback(ltaskRun, L.Lib())},
-		{Name: "wait", Func: lua.NewCallback(ltaskWait, L.Lib())},
-		{Name: "post_message", Func: lua.NewCallback(lpostMessage, L.Lib())},
-		{Name: "new_service", Func: lua.NewCallback(ltaskNewService, L.Lib())},
-		{Name: "init_timer", Func: lua.NewCallback(ltaskInitTimer, L.Lib())},
-		{Name: "init_root", Func: lua.NewCallback(ltaskInitRoot, L.Lib())},
-		{Name: "pushlog", Func: lua.NewCallback(ltaskBootPushLog, L.Lib())},
+		{Name: "deinit", Func: lua.NewCallback(ltaskDeinit)},
+		{Name: "run", Func: lua.NewCallback(ltaskRun)},
+		{Name: "wait", Func: lua.NewCallback(ltaskWait)},
+		{Name: "post_message", Func: lua.NewCallback(lpostMessage)},
+		{Name: "new_service", Func: lua.NewCallback(ltaskNewService)},
+		{Name: "init_timer", Func: lua.NewCallback(ltaskInitTimer)},
+		{Name: "init_root", Func: lua.NewCallback(ltaskInitRoot)},
+		{Name: "pushlog", Func: lua.NewCallback(ltaskBootPushLog)},
 		// We don't need `init_socket` here, as it is proceed by Go runtime automatically.
 		{Name: "pack", Func: luaSerdePack},
 		{Name: "unpack", Func: luaSerdeUnpack},
 		{Name: "remove", Func: luaSerdeRemove},
 		{Name: "unpack_remove", Func: luaSerdeUnpackRemove},
-		{Name: "external_sender", Func: lua.NewCallback(ltaskExternalSender, L.Lib())},
+		{Name: "external_sender", Func: lua.NewCallback(ltaskExternalSender)},
 	}
 
 	L.NewLib(l)
 
 	L.PushLightUserData(L.ToUserData(L.UpValueIndex(1)))
 	l2 := []*lua.Reg{
-		{Name: "init", Func: lua.NewCallback(ltaskInit, L.Lib())},
+		{Name: "init", Func: lua.NewCallback(ltaskInit)},
 	}
 	L.SetFuncs(l2, 1)
 	return 1
@@ -124,8 +120,8 @@ func OpenRoot(L *lua.State) int {
 	// ltask.root is expected to be required only once across the whole program,
 	// so we don't need to make its functions global singletons.
 	l := []*lua.Reg{
-		{Name: "init_service", Func: lua.NewCallback(ltaskInitService, L.Lib())},
-		{Name: "close_service", Func: lua.NewCallback(ltaskCloseService, L.Lib())},
+		{Name: "init_service", Func: lua.NewCallback(ltaskInitService)},
+		{Name: "close_service", Func: lua.NewCallback(ltaskCloseService)},
 	}
 
 	L.NewLibTable(l)

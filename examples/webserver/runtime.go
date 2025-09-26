@@ -17,7 +17,7 @@ type externalFFI struct {
 }
 
 func externalOpenLibs(L *lua.State) {
-	ffi := L.Lib().FFI()
+	ffi := lua.FFI()
 	luaLOpenLibs := ffi.LuaLOpenlibs
 
 	var effi externalFFI
@@ -25,7 +25,7 @@ func externalOpenLibs(L *lua.State) {
 	v := reflect.ValueOf(&effi).Elem()
 
 	var l = []*lua.Reg{
-		{Name: "json", Func: lua.NewCallback(luaOpenJSON, L.Lib())},
+		{Name: "json", Func: lua.NewCallback(luaOpenJSON)},
 	}
 	for i := range t.NumField() {
 		field := t.Field(i)
@@ -44,11 +44,11 @@ func externalOpenLibs(L *lua.State) {
 		fn := *fptr.(*luaopenLib)
 		l = append(l, &lua.Reg{
 			Name: strings.ReplaceAll(strings.TrimPrefix(fname, "luaopen_"), "_", "."),
-			Func: lua.NewCallback(func(L *lua.State) int { return fn(L.L()) }, L.Lib()),
+			Func: lua.NewCallback(func(L *lua.State) int { return fn(L.L()) }),
 		})
 	}
 
-	buildState := L.Lib().BuildState
+	buildState := lua.BuildState
 	ffi.LuaLOpenlibs = func(luaL unsafe.Pointer) {
 		luaLOpenLibs(luaL)
 		L := buildState(luaL)

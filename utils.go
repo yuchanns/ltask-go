@@ -19,11 +19,11 @@ var pushString = lua.NewCallback(func(L *lua.State) int {
 	L.SetTop(1)
 	L.PushString(msg)
 	return 1
-}, lib)
+})
 
 var requireModule = lua.NewCallback(func(L *lua.State) int {
 	name := *(*string)(L.ToUserData(1))
 	fn := *(*lua.GoFunc)(L.ToUserData(2))
 	L.Requiref(name, fn, false)
 	return 0
-}, lib)
+})

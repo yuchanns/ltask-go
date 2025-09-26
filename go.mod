@@ -8,7 +8,7 @@ require (
 	github.com/smasher164/mem v0.0.0-20200311200026-6e9ed23f934d
 	github.com/spf13/pflag v1.0.9
 	github.com/stretchr/testify v1.10.0
-	go.yuchanns.xyz/lua v0.0.0-20250925140239-044956be7116
+	go.yuchanns.xyz/lua v0.0.0-20250926031501-79023a23466d
 	go.yuchanns.xyz/timefall v0.1.0
 	go.yuchanns.xyz/xxchan v0.1.0
 	go.yuchanns.xyz/xxcond v0.1.0

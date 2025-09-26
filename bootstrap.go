@@ -172,7 +172,7 @@ var lmessageReceipt = lua.NewCallback(func(L *lua.State) int {
 	m.delete()
 
 	return 3
-}, lib)
+})
 
 var lsendMessage = lua.NewCallback(func(L *lua.State) int {
 	s := getS(L)
@@ -187,7 +187,7 @@ var lsendMessage = lua.NewCallback(func(L *lua.State) int {
 	}
 
 	return 0
-}, lib)
+})
 
 var lrecvMessage = lua.NewCallback(func(L *lua.State) (r int) {
 	s := getS(L)
@@ -206,7 +206,7 @@ var lrecvMessage = lua.NewCallback(func(L *lua.State) (r int) {
 	}
 	m.delete()
 	return
-}, lib)
+})
 
 func lpostMessage(L *lua.State) int {
 	L.CheckType(1, lua.LUA_TTABLE)

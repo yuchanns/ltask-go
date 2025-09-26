@@ -10,13 +10,10 @@ import (
 	"go.yuchanns.xyz/lua"
 )
 
-var lib = new(lua.Lib)
-
 func externalOpenLibs(L *lua.State) {
-	*lib = *L.Lib()
-	ffi := L.Lib().FFI()
+	ffi := lua.FFI()
 	openLibs := ffi.LuaLOpenlibs
-	buildState := L.Lib().BuildState
+	buildState := lua.BuildState
 	l := []*lua.Reg{
 		{Name: "sapp", Func: openApp},
 	}
@@ -42,7 +39,7 @@ var openApp = lua.NewCallback(func(L *lua.State) int {
 	}
 	L.NewLib(l)
 	return 1
-}, lib)
+})
 
 type sokolMessage struct {
 	Type *byte
@@ -73,7 +70,7 @@ var lsendMessage = lua.NewCallback(func(L *lua.State) int {
 	L.CheckType(1, lua.LUA_TLIGHTUSERDATA)
 	p := L.ToPointer(1)
 	L.CheckType(2, lua.LUA_TSTRING)
-	what := L.Lib().FFI().LuaTolstring(L.L(), 2, nil)
+	what := lua.FFI().LuaTolstring(L.L(), 2, nil)
 	p1 := L.OptInteger(3, 0)
 	var msg unsafe.Pointer
 	if L.GetTop() < 4 || L.IsNoneOrNil(4) {
@@ -84,7 +81,7 @@ var lsendMessage = lua.NewCallback(func(L *lua.State) int {
 	}
 	ltask.ExternalSend(p, msg)
 	return 0
-}, lib)
+})
 
 var lunpackMessage = lua.NewCallback(func(L *lua.State) int {
 	L.CheckType(1, lua.LUA_TLIGHTUSERDATA)
@@ -96,7 +93,7 @@ var lunpackMessage = lua.NewCallback(func(L *lua.State) int {
 	m.Type = nil
 	mem.Free(unsafe.Pointer(m))
 	return 4
-}, lib)
+})
 
 var lunpackEvent = lua.NewCallback(func(L *lua.State) int {
 	L.CheckType(1, lua.LUA_TLIGHTUSERDATA)
@@ -106,11 +103,11 @@ var lunpackEvent = lua.NewCallback(func(L *lua.State) int {
 	L.PushInteger(int64(em.p1))
 	L.PushInteger(int64(em.p2))
 	return 3
-}, lib)
+})
 
 var lquit = lua.NewCallback(func(L *lua.State) int {
 	var quit func()
-	purego.RegisterLibFunc(&quit, L.Lib().FFI().Lib(), "sapp_request_quit")
+	purego.RegisterLibFunc(&quit, lua.FFI().Lib(), "sapp_request_quit")
 	quit()
 	return 0
-}, lib)
+})

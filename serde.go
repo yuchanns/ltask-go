@@ -780,7 +780,7 @@ func mallocFromBuffer(buf []byte) (ptr unsafe.Pointer, alignedSz int) {
 	return
 }
 
-var luaSerdePack = lua.NewCallback(LuaSerdePack, lib)
+var luaSerdePack = lua.NewCallback(LuaSerdePack)
 
 func LuaSerdePack(L *lua.State) int {
 	buf := serdePack(L, 0)
@@ -791,7 +791,7 @@ func LuaSerdePack(L *lua.State) int {
 	return 2
 }
 
-var luaSerdeUnpack = lua.NewCallback(LuaSerdeUnpack, lib)
+var luaSerdeUnpack = lua.NewCallback(LuaSerdeUnpack)
 
 func LuaSerdeUnpack(L *lua.State) int {
 	if L.IsNoneOrNil(1) {
@@ -808,7 +808,7 @@ func LuaSerdeUnpack(L *lua.State) int {
 	return serdeUnpack(L, data)
 }
 
-var luaSerdeUnpackRemove = lua.NewCallback(LuaSerdeUnpackRemove, lib)
+var luaSerdeUnpackRemove = lua.NewCallback(LuaSerdeUnpackRemove)
 
 func LuaSerdeUnpackRemove(L *lua.State) int {
 	if L.IsNoneOrNil(1) {
@@ -828,7 +828,7 @@ func LuaSerdeUnpackRemove(L *lua.State) int {
 	return serdeUnpack(L, data)
 }
 
-var luaSerdeRemove = lua.NewCallback(LuaSerdeRemove, lib)
+var luaSerdeRemove = lua.NewCallback(LuaSerdeRemove)
 
 func LuaSerdeRemove(L *lua.State) int {
 	if L.IsNoneOrNil(1) {
