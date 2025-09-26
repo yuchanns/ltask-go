@@ -7,7 +7,8 @@ import (
 func getErrorMessage(L *lua.State) string {
 	switch L.Type(-1) {
 	case lua.LUA_TLIGHTUSERDATA:
-		return *(*string)(L.ToUserData(-1))
+		ptr := (*byte)(L.ToUserData(-1))
+		return bytePtrToString(ptr)
 	case lua.LUA_TSTRING:
 		return L.ToString(-1)
 	}
@@ -15,15 +16,15 @@ func getErrorMessage(L *lua.State) string {
 }
 
 var pushString = lua.NewCallback(func(L *lua.State) int {
-	msg := *(*string)(L.ToUserData(-1))
+	ptr := (*byte)(L.ToUserData(-1))
 	L.SetTop(1)
-	L.PushString(msg)
+	L.PushString(bytePtrToString(ptr))
 	return 1
 })
 
 var requireModule = lua.NewCallback(func(L *lua.State) int {
-	name := *(*string)(L.ToUserData(1))
+	name := (*byte)(L.ToUserData(1))
 	fn := L.ToUserData(2)
-	L.Requiref(name, uintptr(fn), false)
+	L.Requiref(bytePtrToString(name), uintptr(fn), false)
 	return 0
 })

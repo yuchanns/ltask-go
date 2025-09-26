@@ -27,9 +27,6 @@ type ltask struct {
 	activeWorker        atomicInt
 	threadCount         atomicInt
 	blockedService      int64
-
-	// purego function pointers to avoid exceed limits
-	pushString uintptr
 }
 
 func (task *ltask) allocSockevent() (index int) {
@@ -53,7 +50,6 @@ func (task *ltask) pushLog(id serviceId, data unsafe.Pointer, sz int64) (ok bool
 func (task *ltask) init(L *lua.State, config *ltaskConfig) {
 	task = (*ltask)(L.NewUserDataUv(int(unsafe.Sizeof(*task)), 0))
 	L.SetField(lua.LUA_REGISTRYINDEX, "LTASK_GLOBAL")
-	task.pushString = pushString
 	task.lqueue = newLogQueue()
 	task.config = config
 

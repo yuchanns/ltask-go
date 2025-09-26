@@ -51,11 +51,6 @@ type service struct {
 	stat          memoryStat
 	cpucost       uint64
 	clock         uint64
-
-	// purego function pointers to avoid exceed limits
-	initService   uintptr
-	requireModule uintptr
-	pushString    uintptr
 }
 
 func (s *service) errorMessage(fromL, toL *lua.State, msg string) {
@@ -64,7 +59,7 @@ func (s *service) errorMessage(fromL, toL *lua.State, msg string) {
 	}
 	if fromL != nil {
 		errMsg := fromL.ToString(-1)
-		toL.PushCFunction(s.pushString)
+		toL.PushCFunction(pushString)
 		toL.PushLightUserData(unsafe.Pointer(&errMsg))
 		if toL.PCall(1, 1, 0) == nil {
 			return
@@ -78,7 +73,7 @@ func (s *service) init(ud *serviceUd, queueLen int64, pL *lua.State) (ok bool) {
 	// TODO: compatible 505
 	// malloc
 	L := lua.NewState()
-	L.PushCFunction(s.initService)
+	L.PushCFunction(initService)
 	L.PushLightUserData(ud)
 	L.PushInteger(int64(unsafe.Sizeof(*ud)))
 	if err := L.PCall(2, 0, 0); err != nil {
@@ -100,8 +95,9 @@ func (s *service) requiref(name string, fn uintptr, pL *lua.State) (ok bool) {
 		return false
 	}
 	L := s.rL
-	L.PushCFunction(s.requireModule)
-	L.PushLightUserData(&name)
+	L.PushCFunction(requireModule)
+	ptr, _ := bytePtrFromString(name)
+	L.PushLightUserData(ptr)
 	L.PushLightUserData(*(*unsafe.Pointer)(unsafe.Pointer(&fn)))
 	if L.PCall(2, 0, 0) != nil {
 		s.errorMessage(L, pL, "requiref: pcall error")
@@ -163,11 +159,6 @@ type servicePool struct {
 	queueLen int64
 	id       int32
 	s        []*service
-
-	// purego function pointers to avoid exceed limits
-	initService   uintptr
-	requireModule uintptr
-	pushString    uintptr
 }
 
 func (task *ltask) newServicePool(config *ltaskConfig) (pool *servicePool) {
@@ -180,9 +171,6 @@ func (task *ltask) newServicePool(config *ltaskConfig) (pool *servicePool) {
 	pool.id = 0
 	pool.queueLen = config.queueSending
 	pool.s = unsafe.Slice((**service)(unsafe.Pointer(uintptr(ptr)+uintptr(structSize))), int(config.maxService))
-	pool.pushString = task.pushString
-	pool.initService = initService
-	pool.requireModule = requireModule
 	return
 }
 
@@ -404,8 +392,6 @@ func (p *servicePool) newService(sid serviceId) (svcId serviceId) {
 	s.clock = 0
 	s.sockeventId = -1
 	s.label = [32]byte{}
-	s.initService = p.initService
-	s.requireModule = p.requireModule
 	p.setService(s)
 	return
 }
