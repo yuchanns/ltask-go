@@ -8,13 +8,13 @@ import (
 )
 
 func (s *Suite) TestSerde(assert *require.Assertions, L *lua.State) {
-	L.PushCFunction(lua.NewCallback(ltask.LuaSerdePack, L.Lib()))
+	L.PushCFunction(lua.NewCallback(ltask.LuaSerdePack))
 	L.SetGlobal("pack")
-	L.PushCFunction(lua.NewCallback(ltask.LuaSerdeUnpack, L.Lib()))
+	L.PushCFunction(lua.NewCallback(ltask.LuaSerdeUnpack))
 	L.SetGlobal("unpack")
-	L.PushCFunction(lua.NewCallback(ltask.LuaSerdeUnpackRemove, L.Lib()))
+	L.PushCFunction(lua.NewCallback(ltask.LuaSerdeUnpackRemove))
 	L.SetGlobal("unpack_remove")
-	L.PushCFunction(lua.NewCallback(ltask.LuaSerdeRemove, L.Lib()))
+	L.PushCFunction(lua.NewCallback(ltask.LuaSerdeRemove))
 	L.SetGlobal("remove")
 
 	testFunc1 := func(L *lua.State) int {
@@ -26,9 +26,9 @@ func (s *Suite) TestSerde(assert *require.Assertions, L *lua.State) {
 		return 1
 	}
 
-	L.PushCFunction(lua.NewCallback(testFunc1, L.Lib()))
+	L.PushCFunction(lua.NewCallback(testFunc1))
 	L.SetGlobal("test_func1")
-	L.PushCFunction(lua.NewCallback(testFunc2, L.Lib()))
+	L.PushCFunction(lua.NewCallback(testFunc2))
 	L.SetGlobal("test_func2")
 
 	err := L.DoString(`
@@ -251,9 +251,9 @@ assert(result2() == 42)
 }
 
 func (s *Suite) TestSerdeFunction(assert *require.Assertions, L *lua.State) {
-	L.PushCFunction(lua.NewCallback(ltask.LuaSerdePack, L.Lib()))
+	L.PushCFunction(lua.NewCallback(ltask.LuaSerdePack))
 	L.SetGlobal("pack")
-	L.PushCFunction(lua.NewCallback(ltask.LuaSerdeUnpack, L.Lib()))
+	L.PushCFunction(lua.NewCallback(ltask.LuaSerdeUnpack))
 	L.SetGlobal("unpack")
 
 	err := L.DoString(`

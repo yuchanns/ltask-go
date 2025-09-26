@@ -12,12 +12,11 @@ import (
 )
 
 type Context struct {
-	L   *lua.State
-	Lib *lua.Lib
+	L *lua.State
 }
 
-func New(lib *lua.Lib) *sokol.App {
-	return sokol.NewApp(lib.FFI().Lib(), &Context{Lib: lib})
+func New() *sokol.App {
+	return sokol.NewApp(&Context{})
 }
 
 func (ctx *Context) OnInit(app *sokol.App) (ret int) {
@@ -98,18 +97,15 @@ func pmain(L *lua.State) int {
 }
 
 func (ctx *Context) start() (err error) {
-	L, err := ctx.Lib.NewState()
-	if err != nil {
-		return
-	}
+	L := lua.NewState()
 	defer func() {
 		if err != nil {
 			L.Close()
 		}
 	}()
 
-	L.PushCFunction(lua.NewCallback(msgHandler, ctx.Lib))
-	L.PushCFunction(lua.NewCallback(pmain, ctx.Lib))
+	L.PushCFunction(lua.NewCallback(msgHandler))
+	L.PushCFunction(lua.NewCallback(pmain))
 	err = L.PCall(0, 1, 1)
 	if err != nil {
 		return

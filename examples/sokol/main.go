@@ -28,11 +28,13 @@ func main() {
 	}
 	defer os.Remove(fs.Name())
 
-	lib, err := lua.New(fs.Name())
+	err = lua.Init(fs.Name())
 	if err != nil {
 		log.Fatal().Msgf("%s", err)
 	}
-	defer lib.Close()
+	defer func() {
+		_ = lua.Deinit()
+	}()
 
-	app.New(lib).Run()
+	app.New().Run()
 }

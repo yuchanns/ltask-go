@@ -26,13 +26,15 @@ func main() {
 	}
 	defer os.Remove(fs.Name())
 
-	lib, err := lua.New(fs.Name())
+	err = lua.Init(fs.Name())
 	if err != nil {
 		panic(err)
 	}
-	defer lib.Close()
+	defer func() {
+		_ = lua.Deinit()
+	}()
 
-	L, err := lib.NewState()
+	L := lua.NewState()
 	if err != nil {
 		panic(err)
 	}

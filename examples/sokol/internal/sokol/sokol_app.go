@@ -5,6 +5,7 @@ import (
 	"unsafe"
 
 	"github.com/ebitengine/purego"
+	"go.yuchanns.xyz/lua"
 )
 
 type callback func() int
@@ -29,7 +30,7 @@ type App struct {
 	ffi *ffi
 }
 
-func NewApp(handle uintptr, ctx AppContext) *App {
+func NewApp(ctx AppContext) *App {
 	var ffi ffi
 	t := reflect.TypeOf(&ffi).Elem()
 	v := reflect.ValueOf(&ffi).Elem()
@@ -43,7 +44,7 @@ func NewApp(handle uintptr, ctx AppContext) *App {
 			continue
 		}
 		fptr := v.Field(i).Addr().Interface()
-		purego.RegisterLibFunc(fptr, handle, fname)
+		purego.RegisterLibFunc(fptr, lua.FFI().Lib(), fname)
 	}
 
 	return &App{

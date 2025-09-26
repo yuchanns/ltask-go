@@ -49,14 +49,14 @@ var ltaskSleep = lua.NewCallback(func(L *lua.State) int {
 	csec := L.OptInteger(1, 0)
 	time.Sleep(centisecond * time.Duration(csec))
 	return 0
-}, lib)
+})
 
 var ltaskEventWait = lua.NewCallback(func(L *lua.State) int {
 	event := (*sockEvent)(L.ToUserData(L.UpValueIndex(1)))
 	r := event.wait()
 	L.PushBoolean(r > 0)
 	return 1
-}, lib)
+})
 
 var ltaskEventInit = lua.NewCallback(func(L *lua.State) int {
 	s := getS(L)
@@ -78,7 +78,7 @@ var ltaskEventInit = lua.NewCallback(func(L *lua.State) int {
 	fd := event.fd()
 	L.PushLightUserData(*(*unsafe.Pointer)(unsafe.Pointer(&fd)))
 	return 2
-}, lib)
+})
 
 var ltaskTimerAdd = lua.NewCallback(func(L *lua.State) int {
 	s := getS(L)
@@ -96,7 +96,7 @@ var ltaskTimerAdd = lua.NewCallback(func(L *lua.State) int {
 	}
 	t.Add(ev, time.Duration(ti)*centisecond)
 	return 0
-}, lib)
+})
 
 var ltaskTimerUpdate = lua.NewCallback(func(L *lua.State) int {
 	s := getS(L)
@@ -121,7 +121,7 @@ var ltaskTimerUpdate = lua.NewCallback(func(L *lua.State) int {
 		L.SetI(1, i)
 	}
 	return 1
-}, lib)
+})
 
 var ltaskNow = lua.NewCallback(func(L *lua.State) int {
 	s := getS(L)
@@ -134,13 +134,13 @@ var ltaskNow = lua.NewCallback(func(L *lua.State) int {
 	L.PushInteger(start + now/100)
 	L.PushInteger(start*100 + now)
 	return 2
-}, lib)
+})
 
 var lself = lua.NewCallback(func(L *lua.State) int {
 	s := getS(L)
 	L.PushInteger(int64(s.id))
 	return 1
-}, lib)
+})
 
 var lworkerId = lua.NewCallback(func(L *lua.State) int {
 	s := getS(L)
@@ -150,7 +150,7 @@ var lworkerId = lua.NewCallback(func(L *lua.State) int {
 		return 1
 	}
 	return 0
-}, lib)
+})
 
 var lworkerBind = lua.NewCallback(func(L *lua.State) int {
 	s := getS(L)
@@ -164,14 +164,14 @@ var lworkerBind = lua.NewCallback(func(L *lua.State) int {
 	}
 	s.task.services.setBindingThread(s.id, int32(worker))
 	return 0
-}, lib)
+})
 
 var ltaskLabel = lua.NewCallback(func(L *lua.State) int {
 	s := getS(L)
 	label := s.task.services.getLabel(s.id)
 	L.PushString(label)
 	return 1
-}, lib)
+})
 
 var ltaskPushLog = lua.NewCallback(func(L *lua.State) int {
 	L.CheckType(1, lua.LUA_TLIGHTUSERDATA)
@@ -183,7 +183,7 @@ var ltaskPushLog = lua.NewCallback(func(L *lua.State) int {
 	}
 
 	return 0
-}, lib)
+})
 
 var ltaskPopLog = lua.NewCallback(func(L *lua.State) int {
 	s := getS(L)
@@ -201,7 +201,7 @@ var ltaskPopLog = lua.NewCallback(func(L *lua.State) int {
 	L.PushLightUserData(m.msg)
 	L.PushInteger(m.sz)
 	return 4
-}, lib)
+})
 
 var ltaskReadFile = lua.NewCallback(func(L *lua.State) int {
 	fileName := L.CheckString(1)
@@ -222,7 +222,7 @@ var ltaskReadFile = lua.NewCallback(func(L *lua.State) int {
 	L.PushNil()
 	L.PushString(err.Error())
 	return 2
-}, lib)
+})
 
 var ltaskDoFile = lua.NewCallback(func(L *lua.State) int {
 	fileName := L.CheckString(1)
@@ -249,7 +249,7 @@ var ltaskDoFile = lua.NewCallback(func(L *lua.State) int {
 	L.PushNil()
 	L.PushString(err.Error())
 	return 2
-}, lib)
+})
 
 var ltaskLoadFile = lua.NewCallback(func(L *lua.State) int {
 	fileName := L.CheckString(1)
@@ -275,7 +275,7 @@ var ltaskLoadFile = lua.NewCallback(func(L *lua.State) int {
 	L.PushNil()
 	L.PushString(err.Error())
 	return 2
-}, lib)
+})
 
 var ltaskSearchPath = lua.NewCallback(func(L *lua.State) int {
 	name := L.CheckString(1)
@@ -308,4 +308,4 @@ var ltaskSearchPath = lua.NewCallback(func(L *lua.State) int {
 		}
 	}
 	return 0
-}, lib)
+})

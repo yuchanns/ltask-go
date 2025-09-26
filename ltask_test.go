@@ -13,7 +13,6 @@ import (
 )
 
 type Suite struct {
-	lib *lua.Lib
 }
 
 func (s *Suite) Setup() (err error) {
@@ -26,7 +25,7 @@ func (s *Suite) Setup() (err error) {
 	case "darwin":
 		path = "liblua54.dylib"
 	}
-	s.lib, err = lua.New(fmt.Sprintf("../lua/lua54/.lua/lib/%s", path))
+	err = lua.Init(fmt.Sprintf("../lua/lua54/.lua/lib/%s", path))
 	if err != nil {
 		return
 	}
@@ -35,10 +34,7 @@ func (s *Suite) Setup() (err error) {
 }
 
 func (s *Suite) TearDown() {
-	if s.lib == nil {
-		return
-	}
-	_ = s.lib.Close()
+	_ = lua.Deinit()
 }
 
 func TestSuite(t *testing.T) {
@@ -55,8 +51,7 @@ func TestSuite(t *testing.T) {
 		t.Parallel()
 		assert := require.New(t)
 
-		L, err := suite.lib.NewState()
-		assert.NoError(err)
+		L := lua.NewState()
 
 		L.OpenLibs()
 
@@ -74,8 +69,7 @@ func TestSuite(t *testing.T) {
 			t.Run(strings.TrimPrefix(method.Name, "Test"), func(t *testing.T) {
 				t.Parallel()
 				assert := require.New(t)
-				L, err := suite.lib.NewState()
-				assert.NoError(err)
+				L := lua.NewState()
 
 				L.OpenLibs()
 
