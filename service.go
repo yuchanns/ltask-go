@@ -86,7 +86,9 @@ func (s *service) init(ud *serviceUd, queueLen int64, pL *lua.State) (ok bool) {
 	ptr := malloc.Alloc(uint(xxchan.Sizeof[*message](int(queueLen))))
 	s.msg = xxchan.Make[*message](ptr, int(queueLen))
 	s.L = L
-	s.rL = L.NewThread()
+	s.rL = L.NewThread(lua.WithStatePointer(
+		(*lua.State)(malloc.Alloc(uint(unsafe.Sizeof(lua.State{})))),
+	))
 	L.Ref(lua.LUA_REGISTRYINDEX)
 	return true
 }
@@ -143,6 +145,10 @@ func (s *service) close() {
 		s.L.Close()
 		malloc.Free(unsafe.Pointer(s.L))
 		s.L = nil
+	}
+	if s.rL != nil {
+		malloc.Free(unsafe.Pointer(s.rL))
+		s.rL = nil
 	}
 	if s.msg != nil {
 		for s.msg.Len() > 0 {
